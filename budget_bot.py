@@ -2,57 +2,13 @@ from setting import *
 import telebot
 from telebot import types
 import json
-import requests
-from time import sleep, time
-
+import logging
+from database import DB
 bot = telebot.TeleBot(TOKEN)
 
 
-def get_category(message):
-    category = {
-        1: {'name': 'Питание',
-            'subcategories': {1: {'name': 'Продукты'}, 2: {'name': 'Сладкое'}, 3: {'name': 'Прочее'}}},
-        2: {'name': 'Заведения',
-            'subcategories': {1: {'name': 'Кафе и рестораны'}, 2: {'name': 'Суши'}, 3: {'name': "McDonald's"},
-                              4: {'name': 'Прочее'}}},
-        3: {'name': 'Квартира',
-            'subcategories': {1: {'name': 'Аренда'}, 2: {'name': 'Комуналка'}, 3: {'name': 'Прочее'}}},
-        4: {'name': 'Транспорт',
-            'subcategories': {1: {'name': 'Маршрутка'}, 2: {'name': 'Метро'}, 3: {'name': 'Такси'}}},
-        5: {'name': 'Здоровье',
-            'subcategories': {1: {'name': 'Кафе и рестораны'}, 2: {'name': 'Суши'}, 3: {'name': "McDonald's"},
-                              4: {'name': 'Прочее'}}},
-        6: {'name': 'Одежда',
-            'subcategories': {1: {'name': 'Одежда'}, 2: {'name': 'Обувь'}, 3: {'name': 'Уход за одеждой'},
-                              4: {'name': 'Прочее'}}},
-        7: {'name': 'Гигиена', 'subcategories': {}, },
-        8: {'name': 'Отдых', 'subcategories': {}, },
-        9: {'name': 'Спортзал', 'subcategories': {}, },
-        10: {'name': 'Здоровье', 'subcategories': {}, },
-        11: {'name': 'Техника', 'subcategories': {}, },
-        12: {'name': 'Связь', 'subcategories': {}, },
-    }
-    return category
 
-
-def can_add_category(message):
-    return True
-    from random import randint
-    return randint(0, 1)
-
-
-def can_add_subcategory(message):
-    return True
-    from random import randint
-    return randint(0, 1)
-
-
-def get_report_month(message):
-    return {1: 'Январь', 2: 'Февраль', 3: 'Март', 4: 'Апрель', 5: 'Май'}
-
-
-def get_report_day(message):
-    return {x: x for x in range(1, 32)}
+db = DB()
 
 
 def keyboard_inline(message, bot_, message_text, buttons, callback_key, previous_data, qt_key=3):
@@ -67,31 +23,17 @@ def keyboard_inline(message, bot_, message_text, buttons, callback_key, previous
     bot_.send_message(message.chat.id, message_text, reply_markup=keyboard)
 
 
-# def keyboard_category(message, data):
-#     categories = get_category(message)
-#     buttons_name = {button_id: button_name.get('name', 'Name Error') for button_id, button_name in categories.items()}
-#     keyboard_inline(message, bot, 'Выбери категорию:', buttons_name, callback_key='cat', previous_data=data)
-#
-#
-# def get_subcategories(message, data):
-#     print('get_subcategories')
-#     categories = get_category(message)
-#     callback_data = json.loads(data)
-#     subcategories_dict = categories.get(callback_data.get('cat', ), {}).get('subcategories')
-#     buttons_name = {button_id: button_name.get('name', 'Name Error') for button_id, button_name in
-#                     subcategories_dict.items()}
-#     keyboard_inline(message, bot, 'Выбери подкатегорию:', buttons_name, callback_key='sub', previous_data=data)
-
-
 @bot.message_handler(commands=['add'])
 def add(message):
     print('add')
+    print(message)
     try:
         bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
     except:
         pass
     data = json.dumps({'f': 'amount'})
-    categories = get_category(message)
+    categories = db.get_category(message.from_user.id)
+    print('Kategorii ', categories)
     buttons_name = {button_id: button_name.get('name', 'Name Error') for button_id, button_name in categories.items()}
     keyboard_inline(message, bot, 'Выбери категорию:', buttons_name, callback_key='cat', previous_data=data)
 
@@ -102,7 +44,8 @@ def settings(message):
 
     bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
     data = json.dumps({'f': 'set_stng'})
-    buttons_name = {1: 'Добавить', 2: 'Удалить', 3: 'Получить ID Google Sheets', 4: 'Установить ID Google Sheets'}
+    buttons_name = {1: 'Добавить', 2: 'Удалить', 3: 'Получить ссылку на Google таблицу',
+                    4: 'Изменить ссылку на Google таблицу'}
     keyboard_inline(message, bot, 'Выбери настройки:', buttons_name, callback_key='cat', previous_data=data,
                     qt_key=1, )
 
@@ -119,19 +62,24 @@ def report(message):
 
 @bot.message_handler(commands=['start'])
 def start(message):
+    print(message)
     print('start')
+    # db.add_user(message)
+    categories = db.get_category(message)
 
 
 @bot.message_handler(commands=['help'])
 def help(message):
-    print('help')
+    # print('help')
+    print(message.json)
 
 
 def get_amount(call):
     print('get_amount')
+    print(call)
     callback_data = json.loads(call.data)
-    categories = get_category(call.message)
-    subcategories_dict = categories.get(callback_data.get('cat', ), {}).get('subcategories')
+    categories = db.get_category(call.from_user.id)
+    subcategories_dict = categories.get(callback_data.get('cat', ), {}).get('subcategories', {})
 
     if subcategories_dict and 'sub' not in callback_data:
         bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
@@ -141,20 +89,23 @@ def get_amount(call):
                         previous_data=call.data)
 
     else:
-        category_name = categories.get(callback_data.get('cat', {})).get('name', 'Name Error')
+        category_name = categories.get(callback_data.get('cat'), {}).get('name')
         subcategory_name = subcategories_dict.get(callback_data.get('sub', ), {}).get('name', 'Name Error')
         if subcategories_dict:
-            subcategory_name = f' Подкатегория: {subcategory_name},'
+            subcategory_name = f' Подкатегория: {subcategory_name}.'
         else:
             subcategory_name = ''
-        text_message = f'Категория: {category_name},{subcategory_name} Сумма: '
-
+        text_message = f'Категория: {category_name}.{subcategory_name} Сумма: '
         bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
-        bot.send_message(chat_id=call.message.chat.id, text=text_message, reply_markup=types.ForceReply())
+        if category_name is None:
+            bot.send_message(chat_id=call.message.chat.id, text='Что-то пошло не так (')
+        else:
+            bot.send_message(chat_id=call.message.chat.id, text=text_message, reply_markup=types.ForceReply())
 
 
 def set_settings(call):
     print('set_settings')
+    print(call)
     bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text='Дальше')
     bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
     callback_data = json.loads(call.data)
@@ -168,19 +119,20 @@ def set_settings(call):
         keyboard_inline(call.message, bot, 'Удалить:', buttons_name, callback_key='cat',
                         previous_data=call.data, )
     elif func_id == 3:
-        bot.send_message(chat_id=call.message.chat.id, text='ID Google Sheets: '
-                                                            'G28wZHaKSi7TAC8oOqTjthh8P-EEk_pa8PIirRwSDR4')
+        sheets_id = db.get_google_sheets_id(call.message)
+        bot.send_message(chat_id=call.message.chat.id, text='Ваша ссылка на Google таблицу:\n'
+                                                            'https://docs.google.com/spreadsheets/d/' + sheets_id)
     elif func_id == 4:
-        bot.send_message(chat_id=call.message.chat.id, text='Введите ID Google Sheets:',
+        bot.send_message(chat_id=call.message.chat.id, text='Вставьте ссылку на вашу Google таблицу:',
                          reply_markup=types.ForceReply())
     elif func_id == 11:
-        if can_add_category(call.message):
+        if db.can_add_category(call.message):
             bot.send_message(chat_id=call.message.chat.id, text='Введите новое имя категории:',
                              reply_markup=types.ForceReply())
         else:
             bot.send_message(chat_id=call.message.chat.id, text='Нельзя добавлять больше 15 категорий!')
     elif func_id == 12:
-        categories = get_category(call.message)
+        categories = db.get_category(call.from_user.id)
 
         data = json.dumps({'f': 'add_s'})
         buttons_name = {button_id: button_name.get('name', 'Name Error') for button_id, button_name in
@@ -188,16 +140,16 @@ def set_settings(call):
         keyboard_inline(call.message, bot, 'Выберите категорию:', buttons_name, callback_key='cat',
                         previous_data=data)
     elif func_id == 21:
-        categories = get_category(call.message)
+        categories = db.get_category(call.from_user.id)
 
-        data = json.dumps({'f': 'del', 'af': 1, 'ask': 1})
+        data = json.dumps({'f': 'del', 'af': 1, 'a': 1})
         buttons_name = {button_id: button_name.get('name', 'Name Error') for button_id, button_name in
                         categories.items()}
         keyboard_inline(call.message, bot, 'Удалить категорию:', buttons_name, callback_key='cat',
                         previous_data=data)
 
     elif func_id == 22:
-        categories = get_category(call.message)
+        categories = db.get_category(call.from_user.id)
         data = json.dumps({'f': 'dels'})
         buttons_name = {button_id: button_name.get('name', 'Name Error') for button_id, button_name in
                         categories.items()}
@@ -229,58 +181,64 @@ def get_report(call):
     report_for = callback_data.get('cat')
     if report_for == 4:
         if 'mnth' not in callback_data:
-            buttons_name = get_report_month(call.message)
+            buttons_name = db.get_report_month(call.message)
             keyboard_inline(call.message, bot, 'Выберите подкатегорию:', buttons_name, callback_key='mnth',
                             previous_data=call.data)
         elif 'day' not in callback_data:
-            buttons_name = get_report_day(call.message)
+            buttons_name = db.get_report_day(call.message)
             keyboard_inline(call.message, bot, 'Выберите подкатегорию:', buttons_name, callback_key='day',
                             previous_data=call.data)
         else:
             exact_day = {'month': callback_data.get('mnth'), 'day': callback_data.get('day')}
             prepare_report(call, exact_day=exact_day)
-
     else:
         prepare_report(call, report_for)
 
 
 def delete_category(call):
     print('delete')
+    print(call)
     bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
     callback_data = json.loads(call.data)
-    categories = get_category(call.message)
+    categories = db.get_category(call.from_user.id)
     category_name = categories.get(callback_data.get('cat', {})).get('name', 'Name Error')
-    if callback_data.get('answ'):
-        bot.send_message(chat_id=call.message.chat.id, text=f'Удалил категорию: {category_name}')
+    if callback_data.get('an'):
+        if db.delete_category(call.message, callback_data.get('cat')):
+            bot.send_message(chat_id=call.message.chat.id, text=f'Удалил категорию: {category_name}')
+        else:
+            bot.send_message(chat_id=call.message.chat.id, text='Что-то пошло не так (')
 
 
 def delete_subcategories(call):
     print('delete_subcategories')
+    print(call)
     bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
     callback_data = json.loads(call.data)
-    categories = get_category(call.message)
+    categories = db.get_category(call.from_user.id)
     subcategories_dict = categories.get(callback_data.get('cat', ), {}).get('subcategories')
     if not subcategories_dict:
         bot.send_message(chat_id=call.message.chat.id, text='Нет подкатегорий')
     elif subcategories_dict and 'sub' not in callback_data:
         data = json.loads(call.data)
         data['af'] = 1
-        data['ask'] = 2
-
+        data['a'] = 2
         buttons_name = {button_id: button_name.get('name', 'Name Error') for button_id, button_name in
                         subcategories_dict.items()}
         keyboard_inline(call.message, bot, 'Выбери подкатегорию:', buttons_name, callback_key='sub',
                         previous_data=json.dumps(data))
-    elif callback_data.get('answ'):
+    elif callback_data.get('an'):
         subcategory_name = subcategories_dict.get(callback_data.get('sub', ), {}).get('name', 'Name Error')
-        bot.send_message(chat_id=call.message.chat.id, text=f'Удалил подкатегорию: {subcategory_name}')
+        if db.delete_subcategory(call, callback_data.get('cat'), callback_data.get('sub')):
+            bot.send_message(chat_id=call.message.chat.id, text=f'Удалил подкатегорию: {subcategory_name}')
+        else:
+            bot.send_message(chat_id=call.message.chat.id, text='Что-то пошло не так (')
 
 
 def ask_again(call):
     print('ask_again')
     bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
     callback_data = json.loads(call.data)
-    categories = get_category(call.message)
+    categories = db.get_category(call.from_user.id)
     category_name = categories.get(callback_data.get('cat', ), {}).get('name', 'Name Error')
     subcategories_name = categories.get(callback_data.get('cat', ), {}).get('subcategories', {}).get(
         callback_data.get('sub', ), {}).get('name', 'Name Error')
@@ -290,54 +248,45 @@ def ask_again(call):
     print(call.data)
     print(len(call.data))
     buttons_name = {1: 'Да', 0: 'Нет'}
-    keyboard_inline(call.message, bot, t.get(callback_data.get('ask'), 'Вы уверенны?'), buttons_name,
-                    callback_key='answ', previous_data=call.data)
+    keyboard_inline(call.message, bot, t.get(callback_data.get('a'), 'Вы уверенны?'), buttons_name,
+                    callback_key='an', previous_data=call.data)
 
 
 def add_subcategory(call):
     print('add_subcategory')
+    print(call)
+    callback_data = json.loads(call.data)
+    categories = db.get_category(call.from_user.id)
+    category_name = categories.get(callback_data.get('cat'), {}).get('name')
     bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
-    if can_add_subcategory(call.message):
-        bot.send_message(chat_id=call.message.chat.id, text='Введите новое имя подкатегории:',
+    if db.can_add_subcategory(call.message):
+        bot.send_message(chat_id=call.message.chat.id, text=f'Категория: {category_name}. '
+                                                            f'Введите новое имя подкатегории:',
                          reply_markup=types.ForceReply())
     else:
         bot.send_message(chat_id=call.message.chat.id, text='Нельзя добавлять больше 6 подкатегорий!')
 
 
-FUNC = {  # 'sub': subcategories,
-    'amount': get_amount,
-    'set_stng': set_settings,
-    'get_rp': get_report,
-    'del': delete_category,
-    'dels': delete_subcategories,
-    'ask': ask_again,
-    'add_s': add_subcategory, }
-
-
-def change_id_sheets(message):
-    return True
-
-
-def run_function(call):
-    print('run_function')
-    try:
-        func = FUNC.get(json.loads(call.data).get('f'), lambda *args, **kwargs: False)
-        func(call)
-    except Exception as e:
-        print(e)
+FUNC = {'amount': get_amount,
+        'set_stng': set_settings,
+        'get_rp': get_report,
+        'del': delete_category,
+        'dels': delete_subcategories,
+        'a': ask_again,
+        'add_s': add_subcategory, }
 
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
     print('callback_inline')
-    if json.loads(call.data).get('af') and 'answ' not in json.loads(call.data):
-        print()
-        print(call)
-        print()
+    # try:
+    if json.loads(call.data).get('af') and 'an' not in json.loads(call.data):
         ask_again(call)
-
     else:
-        run_function(call)
+        func = FUNC.get(json.loads(call.data).get('f'), lambda *args, **kwargs: False)
+        func(call)
+    # except Exception as e:
+    #     print(e)
 
 
 @bot.message_handler(content_types=['text'])
@@ -350,44 +299,70 @@ def text(message):
             bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
         except:
             pass
-    if message.reply_to_message.text.find('Категория') != -1:
-        if message.reply_to_message.text.find(' грн.') != -1:
-            bot.send_message(chat_id=message.chat.id,
-                             text='Уже есть')
-        else:
-            try:
+        if message.reply_to_message.text.find('Категория') != -1 and message.reply_to_message.text.find('Сумма:') != -1:
+            if message.reply_to_message.text.find(' грн.') != -1:
                 bot.send_message(chat_id=message.chat.id,
-                                 text='Добавил:\n{} {} грн.'.format(message.reply_to_message.text, int(message.text)))
+                                 text='Уже есть')
+            else:
+                try:
+                    amount = int(message.text)
+                    if len(message.text) <= 15:
+                        bot.send_message(chat_id=message.chat.id,
+                                         text=f'Добавил:\n{message.reply_to_message.text} {amount} грн.')
+                    else:
+                        pass
 
-            except:
+                except:
+                    bot.send_message(chat_id=message.chat.id,
+                                     text='Чет не то с суммой, давай по новой!\n'
+                                          'К примеру: 1 грн 55 копеек нужно накисать как 1.55')
+            add(message)
+        if message.reply_to_message.text.find('Вставьте ссылку на вашу Google таблицу:') != -1:
+            id_sheet = db.set_google_sheets_id(message)
+            if id_sheet:
                 bot.send_message(chat_id=message.chat.id,
-                                 text='Чет не то с суммой, давай по новой!\n'
-                                      'К примеру: 1 грн 55 копеек нужно накисать как 1.55')
-        add(message)
-    if message.reply_to_message.text.find('Введите ID Google Sheets:') != -1:
-        id_sheet = 'G28wZHaKSi7TAC8oOqTjthh8P-EEk_pa8PIirRwSDR4'
-        if change_id_sheets(message):
-            bot.send_message(chat_id=message.chat.id,
-                             text='Изменил ID Google Sheets на: {}'.format(id_sheet))
+                                 text=f'Заменил ссылку на: https://docs.google.com/spreadsheets/d/{id_sheet[0]}')
+            else:
+                bot.send_message(chat_id=message.chat.id, text='Что-то не так c сылкой.')
 
-    if message.reply_to_message.text.find('Введите новое имя категории:') != -1:
-        bot.send_message(chat_id=message.chat.id,
-                         text=f'Добавил категорию {message.text}.')
+        if message.reply_to_message.text.find('Введите новое имя категории:') != -1:
+            if message.text.isalpha():
+                if db.add_category(message):
+                    bot.send_message(chat_id=message.chat.id,
+                                     text=f'Добавил категорию {message.text}.')
+                else:
+                    bot.send_message(chat_id=message.chat.id, text='Что-то пошло не так (')
+            else:
+                bot.send_message(chat_id=message.chat.id, text='Используйте только буквы для названия категории!\n'
+                                                               'Попробуйте снова.')
 
-    if message.reply_to_message.text.find('Введите новое имя подкатегории:') != -1:
-        bot.send_message(chat_id=message.chat.id,
-                         text=f'Добавил подкатегорию {message.text}.')
+        if message.reply_to_message.text.find('Введите новое имя подкатегории:') != -1:
+            if message.text.isalpha():
+                if db.add_subcategory(message):
+                    bot.send_message(chat_id=message.chat.id,
+                                     text=f'Добавил подкатегорию {message.text}.')
+                else:
+                    bot.send_message(chat_id=message.chat.id,
+                                     text='Что-то не так')
+            else:
+                bot.send_message(chat_id=message.chat.id, text='Используйте только буквы для названия подкатегории!\n'
+                                                               'Попробуйте снова.')
 
 
-bot.polling()
-# last_send = 0
-# while True:
-#     try:
-#         bot.polling()
-#     except Exception as e:
-#         if last_send + 60 < time():
-#             response = requests.post(
-#                 url='https://api.telegram.org/bot{}/sendMessage'.format(TOKEN_2),
-#                 data={'chat_id': -326310326, 'text': 'Проблемы у Budget bot\n{}'.format(e)}
-#             ).json()
-#             last_send = time()
+def main():
+    bot.polling()
+    # last_send = 0
+    # while True:
+    #     try:
+    #         bot.polling()
+    #     except Exception as e:
+    #         if last_send + 60 < time():
+    #             response = requests.post(
+    #                 url='https://api.telegram.org/bot{}/sendMessage'.format(TOKEN_2),
+    #                 data={'chat_id': -326310326, 'text': 'Проблемы у Budget bot\n{}'.format(e)}
+    #             ).json()
+    #             last_send = time()
+
+
+if __name__ == '__main__':
+    main()

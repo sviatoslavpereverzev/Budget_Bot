@@ -4,10 +4,11 @@ from telebot import types
 import json
 import logging
 from database import DB
+from datetime import datetime, timedelta
+import calendar
+
+MAX_LEN_NAME_CATEGORY = 25
 bot = telebot.TeleBot(TOKEN)
-
-
-
 db = DB()
 
 
@@ -26,14 +27,12 @@ def keyboard_inline(message, bot_, message_text, buttons, callback_key, previous
 @bot.message_handler(commands=['add'])
 def add(message):
     print('add')
-    print(message)
     try:
         bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
     except:
         pass
     data = json.dumps({'f': 'amount'})
     categories = db.get_category(message.from_user.id)
-    print('Kategorii ', categories)
     buttons_name = {button_id: button_name.get('name', 'Name Error') for button_id, button_name in categories.items()}
     keyboard_inline(message, bot, 'Выбери категорию:', buttons_name, callback_key='cat', previous_data=data)
 
@@ -45,7 +44,7 @@ def settings(message):
     bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
     data = json.dumps({'f': 'set_stng'})
     buttons_name = {1: 'Добавить', 2: 'Удалить', 3: 'Получить ссылку на Google таблицу',
-                    4: 'Изменить ссылку на Google таблицу'}
+                    4: 'Изменить ссылку на Google таблицу', 5: 'Отмена'}
     keyboard_inline(message, bot, 'Выбери настройки:', buttons_name, callback_key='cat', previous_data=data,
                     qt_key=1, )
 
@@ -62,21 +61,19 @@ def report(message):
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    print(message)
     print('start')
-    # db.add_user(message)
-    categories = db.get_category(message)
+
+    db.add_user(message)
 
 
 @bot.message_handler(commands=['help'])
 def help(message):
-    # print('help')
     print(message.json)
 
 
 def get_amount(call):
     print('get_amount')
-    print(call)
+
     callback_data = json.loads(call.data)
     categories = db.get_category(call.from_user.id)
     subcategories_dict = categories.get(callback_data.get('cat', ), {}).get('subcategories', {})
@@ -105,7 +102,7 @@ def get_amount(call):
 
 def set_settings(call):
     print('set_settings')
-    print(call)
+
     bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text='Дальше')
     bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
     callback_data = json.loads(call.data)
@@ -119,18 +116,19 @@ def set_settings(call):
         keyboard_inline(call.message, bot, 'Удалить:', buttons_name, callback_key='cat',
                         previous_data=call.data, )
     elif func_id == 3:
-        sheets_id = db.get_google_sheets_id(call.message)
-        bot.send_message(chat_id=call.message.chat.id, text='Ваша ссылка на Google таблицу:\n'
-                                                            'https://docs.google.com/spreadsheets/d/' + sheets_id)
+        sheets_id = db.get_google_sheets_id(call.from_user.id)
+        if sheets_id is None:
+            bot.send_message(chat_id=call.message.chat.id, text='Cсылка на Google таблицу не установленна')
+        else:
+            bot.send_message(chat_id=call.message.chat.id, text='Ваша ссылка на Google таблицу:\n'
+                                                                'https://docs.google.com/spreadsheets/d/' + sheets_id)
     elif func_id == 4:
         bot.send_message(chat_id=call.message.chat.id, text='Вставьте ссылку на вашу Google таблицу:',
                          reply_markup=types.ForceReply())
     elif func_id == 11:
-        if db.can_add_category(call.message):
-            bot.send_message(chat_id=call.message.chat.id, text='Введите новое имя категории:',
-                             reply_markup=types.ForceReply())
-        else:
-            bot.send_message(chat_id=call.message.chat.id, text='Нельзя добавлять больше 15 категорий!')
+        buttons_name = {31: 'Доходы', 32: 'Расходы', }
+        keyboard_inline(call.message, bot, 'Выберите тип категории:', buttons_name, callback_key='cat',
+                        previous_data=call.data, )
     elif func_id == 12:
         categories = db.get_category(call.from_user.id)
 
@@ -155,49 +153,86 @@ def set_settings(call):
                         categories.items()}
         keyboard_inline(call.message, bot, 'Выберите категорию:', buttons_name, callback_key='cat',
                         previous_data=data)
+    elif func_id == 31 or func_id == 32:
+        if db.can_add_category(call.from_user.id):
+            bot.send_message(chat_id=call.message.chat.id,
+                             text='Введите новое имя категории {}:'.format('доходов' if func_id == 31 else 'расходов'),
+                             reply_markup=types.ForceReply())
+        else:
+            bot.send_message(chat_id=call.message.chat.id, text='Нельзя добавлять больше 15 категорий!')
 
 
-def prepare_report(call, report_for=None, exact_day=None):
+def prepare_report(call, report_for=None, exact_month=None):
+    print('prepare_report')
+
+    c = calendar.Calendar()
+    month = datetime.now().month
+    year = datetime.now().year
+    message_text = None
+
     if report_for == 1:
-        message_text = 'Report day'
+        time_to = datetime.now().strftime('%Y-%m-%d ') + '23:59:59'
+        time_from = datetime.now().strftime('%Y-%m-%d ') + '00:00:00'
+        report_ = db.generate_report(time_from, time_to, call.from_user.id)
+        if report_:
+            message_text = f'{"-"*50}\nОтчет за день: \n\n{report_}'
+
     elif report_for == 2:
-        message_text = 'Report week'
+        time_from = list(week for week in c.monthdatescalendar(year, month) if datetime.now().date() in week)[0][0]
+        time_to = list(week for week in c.monthdatescalendar(year, month) if datetime.now().date() in week)[0][-1]
+        report_ = db.generate_report(time_from, time_to, call.from_user.id)
+        if report_:
+            message_text = f'{"-"*50}\nОтчет за неделю: \n\n{report_}'
+
     elif report_for == 3:
-        message_text = 'Report month'
-    elif exact_day:
-        month = exact_day.get('month')
-        day = exact_day.get('day')
-        message_text = f'Report Day:{day} Month:{month}'
+        time_from = [day for day in c.itermonthdates(year, month) if day.month == 5][0]
+        time_to = [day for day in c.itermonthdates(year, month) if day.month == 5][-1]
+        report_ = db.generate_report(time_from, time_to, call.from_user.id)
+        if report_:
+            message_text = f'{"-"*50}\nОтчет за месяц: \n\n{report_}'
+
+    elif exact_month:
+        month = int(exact_month.split('_')[0])
+        year = int(str(datetime.now().year)[:-1] + exact_month.split('_')[1])
+
+        time_from = [day for day in c.itermonthdates(year, month) if day.month == month][0].strftime(
+            '%Y-%m-%d 00:00:00')
+        time_to = [day for day in c.itermonthdates(year, month) if day.month == month][-1].strftime('%Y-%m-%d 23:59:59')
+        report_ = db.generate_report(time_from, time_to, call.from_user.id)
+        if report_:
+            message_text = f'{"-"*50}\nОтчет за месяц: \n\n{report_}'
+
+    if message_text:
+        bot.send_message(chat_id=call.message.chat.id,
+                         text=message_text)
     else:
-        message_text = 'Error Report'
-    bot.send_message(chat_id=call.message.chat.id,
-                     text=message_text)
+        bot.send_message(chat_id=call.message.chat.id,
+                         text='Нет затрат за этот период')
 
 
 def get_report(call):
+    print('get_report')
+
     bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text='Дальше')
     bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
     callback_data = json.loads(call.data)
     report_for = callback_data.get('cat')
+
     if report_for == 4:
-        if 'mnth' not in callback_data:
-            buttons_name = db.get_report_month(call.message)
-            keyboard_inline(call.message, bot, 'Выберите подкатегорию:', buttons_name, callback_key='mnth',
-                            previous_data=call.data)
-        elif 'day' not in callback_data:
-            buttons_name = db.get_report_day(call.message)
-            keyboard_inline(call.message, bot, 'Выберите подкатегорию:', buttons_name, callback_key='day',
+        if 'date' not in callback_data:
+            buttons_name = db.get_report_month(call.from_user.id)
+            keyboard_inline(call.message, bot, 'Выберите подкатегорию:', buttons_name, callback_key='date',
                             previous_data=call.data)
         else:
-            exact_day = {'month': callback_data.get('mnth'), 'day': callback_data.get('day')}
-            prepare_report(call, exact_day=exact_day)
+            exact_month = callback_data.get('date')
+            prepare_report(call, exact_month=exact_month)
     else:
         prepare_report(call, report_for)
 
 
 def delete_category(call):
     print('delete')
-    print(call)
+
     bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
     callback_data = json.loads(call.data)
     categories = db.get_category(call.from_user.id)
@@ -211,7 +246,7 @@ def delete_category(call):
 
 def delete_subcategories(call):
     print('delete_subcategories')
-    print(call)
+
     bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
     callback_data = json.loads(call.data)
     categories = db.get_category(call.from_user.id)
@@ -236,6 +271,7 @@ def delete_subcategories(call):
 
 def ask_again(call):
     print('ask_again')
+
     bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
     callback_data = json.loads(call.data)
     categories = db.get_category(call.from_user.id)
@@ -245,8 +281,6 @@ def ask_again(call):
     t = {1: f'Удалить категорию {category_name}?',
          2: f'Удалить подкатегорию {subcategories_name}?'}
 
-    print(call.data)
-    print(len(call.data))
     buttons_name = {1: 'Да', 0: 'Нет'}
     keyboard_inline(call.message, bot, t.get(callback_data.get('a'), 'Вы уверенны?'), buttons_name,
                     callback_key='an', previous_data=call.data)
@@ -254,12 +288,12 @@ def ask_again(call):
 
 def add_subcategory(call):
     print('add_subcategory')
-    print(call)
+
     callback_data = json.loads(call.data)
     categories = db.get_category(call.from_user.id)
     category_name = categories.get(callback_data.get('cat'), {}).get('name')
     bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
-    if db.can_add_subcategory(call.message):
+    if db.can_add_subcategory(call):
         bot.send_message(chat_id=call.message.chat.id, text=f'Категория: {category_name}. '
                                                             f'Введите новое имя подкатегории:',
                          reply_markup=types.ForceReply())
@@ -279,20 +313,21 @@ FUNC = {'amount': get_amount,
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
     print('callback_inline')
-    # try:
-    if json.loads(call.data).get('af') and 'an' not in json.loads(call.data):
-        ask_again(call)
-    else:
-        func = FUNC.get(json.loads(call.data).get('f'), lambda *args, **kwargs: False)
-        func(call)
-    # except Exception as e:
-    #     print(e)
+
+    try:
+        if json.loads(call.data).get('af') and 'an' not in json.loads(call.data):
+            ask_again(call)
+        else:
+            func = FUNC.get(json.loads(call.data).get('f'), lambda *args, **kwargs: False)
+            func(call)
+    except Exception as e:
+        print(e)
 
 
 @bot.message_handler(content_types=['text'])
 def text(message):
     print('text')
-    print(message)
+
     if message.reply_to_message:
         try:
             bot.delete_message(chat_id=message.chat.id, message_id=message.reply_to_message.message_id)
@@ -305,12 +340,17 @@ def text(message):
                                  text='Уже есть')
             else:
                 try:
-                    amount = int(message.text)
-                    if len(message.text) <= 15:
-                        bot.send_message(chat_id=message.chat.id,
-                                         text=f'Добавил:\n{message.reply_to_message.text} {amount} грн.')
+                    amount = round(float(message.text), 2)
+                    if amount < 92233720368547758.07:
+                        if db.add_data(message):
+                            bot.send_message(chat_id=message.chat.id,
+                                             text=f'Добавил:\n{message.reply_to_message.text} {message.text} грн.')
+                        else:
+                            bot.send_message(chat_id=message.chat.id, text='Видимо у меня проблемы, попробуй позже')
+
                     else:
-                        pass
+                        bot.send_message(chat_id=message.chat.id,
+                                         text='Это слишком большая сумма.')
 
                 except:
                     bot.send_message(chat_id=message.chat.id,
@@ -321,24 +361,32 @@ def text(message):
             id_sheet = db.set_google_sheets_id(message)
             if id_sheet:
                 bot.send_message(chat_id=message.chat.id,
-                                 text=f'Заменил ссылку на: https://docs.google.com/spreadsheets/d/{id_sheet[0]}')
+                                 text=f'Заменил ссылку на: https://docs.google.com/spreadsheets/d/{id_sheet}')
             else:
                 bot.send_message(chat_id=message.chat.id, text='Что-то не так c сылкой.')
 
-        if message.reply_to_message.text.find('Введите новое имя категории:') != -1:
+        if message.reply_to_message.text.find('Введите новое имя категории') != -1:
             if message.text.isalpha():
-                if db.add_category(message):
+                if len(message.text) >= MAX_LEN_NAME_CATEGORY:
+                    bot.send_message(chat_id=message.chat.id,
+                                     text=f'Очень длинное название ')
+                # Длина не больше
+                elif db.add_category(message):
                     bot.send_message(chat_id=message.chat.id,
                                      text=f'Добавил категорию {message.text}.')
                 else:
                     bot.send_message(chat_id=message.chat.id, text='Что-то пошло не так (')
             else:
-                bot.send_message(chat_id=message.chat.id, text='Используйте только буквы для названия категории!\n'
-                                                               'Попробуйте снова.')
+                bot.send_message(chat_id=message.chat.id,
+                                 text='Используйте только буквы для названия категории без пробелов!\n'
+                                      'Попробуйте снова.')
 
         if message.reply_to_message.text.find('Введите новое имя подкатегории:') != -1:
             if message.text.isalpha():
-                if db.add_subcategory(message):
+                if len(message.text) >= MAX_LEN_NAME_CATEGORY:
+                    bot.send_message(chat_id=message.chat.id,
+                                     text=f'Очень длинное название ')
+                elif db.add_subcategory(message):
                     bot.send_message(chat_id=message.chat.id,
                                      text=f'Добавил подкатегорию {message.text}.')
                 else:

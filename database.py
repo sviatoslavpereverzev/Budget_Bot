@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from setting import *
 import re
 import json
@@ -10,7 +11,7 @@ MAXIMUM_NUMBER_SUBCATEGORIES = 6
 
 
 class DB:
-    def __init__(self):
+    def __init__(self, ):
         self.category = {
             1: {'name': 'Питание',
                 'subcategories': {1: {'name': 'Продукты'}, 2: {'name': 'Сладкое'}, 3: {'name': 'Прочее'}, },
@@ -178,7 +179,7 @@ class DB:
         category = self.get_category(call.message.chat.id)
         callback_data = json.loads(call.data)
         category = category.get(callback_data.get('cat'), {})
-        subcategory = category.get('subcategories')
+        subcategory = category.get('subcategories', {})
         return len(subcategory) < MAXIMUM_NUMBER_SUBCATEGORIES
 
     @staticmethod

@@ -1,0 +1,10 @@
+[BUDGET_BOT]
+token = <bot token>
+max_len_category = <number of categories>
+max_len_subcategory = <number of subcategories>
+
+[DATABASE]
+db_password = <database password>
+db_user = <database user>
+db_host = <database host>
+database = <database name>

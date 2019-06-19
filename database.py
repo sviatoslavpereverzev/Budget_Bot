@@ -362,31 +362,77 @@ class DB:
                 logging.error('ANSWER ERROR. QUERY: {}'.format(query))
         return answer[0]
 
-    def set_google_sheets_id(self, message):
+    def set_google_sheets_id(self, id_sheet, user_id):
         print('set_google_sheets_id')
 
         # обновлять дату
-        id_sheets = (re.findall(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', message.text))
-        if id_sheets:
-            if True:  # попытка подконектиться
-                pass
+        if id_sheet.rfind('https://docs.google.com') != -1:
+            id_sheet = re.findall(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', id_sheet)[0]
 
-            with DB() as db:
-                query = "UPDATE budget_bot_users SET sheet_id = '{}' WHERE user_id = {};".format(id_sheets[0],
-                                                                                                 message.from_user.id)
-                db.execute(query)
-                query = "SELECT sheet_id FROM budget_bot_users WHERE user_id= %s" % message.from_user.id
-                db.execute(query)
-                answer = db.fetchone()
-                if answer is None:
-                    logging.error('ANSWER ERROR. QUERY: {}'.format(query))
+        if not id_sheet:
+            return
+        with DB() as db:
+            query = "UPDATE budget_bot_users SET sheet_id = '{}' WHERE user_id = {};".format(id_sheet,
+                                                                                             user_id)
+            db.execute(query)
 
-            return answer[0]
+        return id_sheet
+
+    @staticmethod
+    def set_google_sheet_id_change(id_sheet, user_id):
+
+        # обновлять дату
+        if id_sheet.rfind('https://docs.google.com') != -1:
+            id_sheet = re.findall(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', id_sheet)[0]
+        if not id_sheet:
+            return
+        with DB() as db:
+            query = "UPDATE budget_bot_users SET sheet_id_change = '{}' WHERE user_id = {};".format(id_sheet,
+                                                                                                    user_id)
+            db.execute(query)
+        return id_sheet
+
+    @staticmethod
+    def reset_google_sheets_id(user_id):
+        with DB() as db:
+            query = "UPDATE budget_bot_users SET sheet_id = NULL WHERE user_id = {};".format(user_id)
+            db.execute(query)
+
+
+    @staticmethod
+    def reset_google_sheet_id_change(user_id):
+        with DB() as db:
+            query = "UPDATE budget_bot_users SET sheet_id_change = NULL WHERE user_id = {};".format(user_id)
+            db.execute(query)
+
+    def create_sheets_for(self):
+        with DB() as db:
+            query = "SELECT DISTINCT user_id FROM budget_bot_users WHERE sheet_id is NULL;"
+            db.execute(query)
+            answer = db.fetchall()
+        return answer
+
+    def change_sheet_id(self):
+        with DB() as db:
+            query = "SELECT DISTINCT user_id FROM budget_bot_users WHERE sheet_id_change is NOT NULL;"
+            db.execute(query)
+            answer = db.fetchall()
+        return answer
+
+    def add_data_in_sheet(self):
+        with DB() as db:
+            query = "SELECT DISTINCT user_id FROM budget_bot_data WHERE is_add_in_sheet IS FALSE;"
+            db.execute(query)
+            answer = db.fetchall()
+        return answer
 
 
 if __name__ == '__main__':
     db = DB()
-    db.get_report_month(529088251)
+    # db.get_report_month(529088251)
+    # print(db.create_sheets_id())
+    # print(db.change_sheet_id())
+    # print(db.add_data_in_sheet())
     # db.get_report_for_day(529088251)
     # print()
     # db.get_report_for_week(529088251)
@@ -394,3 +440,4 @@ if __name__ == '__main__':
     # db.get_report_for_month(529088251)
     # db._create_table_users()
     # db._create_table_data()
+    db.reset_google_sheets_id(529088251)

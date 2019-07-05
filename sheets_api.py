@@ -1,17 +1,25 @@
 # -*- coding: utf-8 -*-
 from configparser import ConfigParser
 import os
+import json
+import pickle
 import httplib2
 import logging
+from datetime import datetime
+
 import apiclient.discovery
 from oauth2client.service_account import ServiceAccountCredentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+from googleapiclient.errors import HttpError
+
 from pprint import pprint
 import pickle
 from datetime import datetime
 from database import DB
 from cryptography.fernet import Fernet
+
+from budget_bot import send_message_telegram
 
 
 class SheetsApi:
@@ -22,6 +30,8 @@ class SheetsApi:
 
         self.model_spreadsheet_id = None
         self.model_sheets_id = None
+        self.data_sheets_id = None
+        self.email_budget_bot = None
 
         self.config = ConfigParser()
         self.set_settings()
@@ -31,7 +41,8 @@ class SheetsApi:
         self.model_spreadsheet_id = self.config.get('SHEETS_API', 'model_spreadsheet_id')
         self.model_sheets_id = [int(sheets_id) for sheets_id in
                                 self.config.get('SHEETS_API', 'model_sheets_id').split(',')]
-        pass
+        self.data_sheets_id = [self.config.getint('SHEETS_API', 'data_sheets_id')]
+        self.email_budget_bot = self.config.get('SHEETS_API', 'email_budget_bot')
 
     def set_service(self):
         # credentials = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', self.scope)
@@ -53,7 +64,7 @@ class SheetsApi:
             with open('token.pickle', 'wb') as token:
                 pickle.dump(creds, token)
 
-        self.driveService = apiclient.discovery.build('drive', 'v3', credentials=creds)
+        self.drive_service = apiclient.discovery.build('drive', 'v3', credentials=creds)
         self.service = apiclient.discovery.build('sheets', 'v4', credentials=creds)
         pprint(self.service)
 
@@ -62,7 +73,7 @@ class SheetsApi:
         for user_id in users_id:
             request_body = {
                 'properties': {
-                    'title': self.encrypt(user_id[0]),
+                    'title': self.encrypt(user_id),
                     'locale': 'uk',
                     'timeZone': 'Europe/Kiev'
                 }
@@ -71,33 +82,49 @@ class SheetsApi:
                 request = self.service.spreadsheets().create(body=request_body)
                 response = request.execute()
             except Exception as e:
-                logging.error(f'Error create spreadsheet for user {user_id[0]}. Error: {e}')
+                logging.error(f'Error create spreadsheet for user {user_id}. Error: {e}')
                 continue
 
             new_spreadsheet_id = response['spreadsheetId']
             spreadsheet_url = response['spreadsheetUrl']
 
-            # copy to spreadsheet
-            request_body = {
-                'destinationSpreadsheetId': new_spreadsheet_id
-            }
-            sheets_name = {}
-            error_copy_to_spreadsheet = None
-            for sheet_id in self.model_sheets_id:
-                try:
-                    request = self.service.spreadsheets().sheets().copyTo(spreadsheetId=self.model_spreadsheet_id,
-                                                                          sheetId=sheet_id,
-                                                                          body=request_body)
-                    response = request.execute()
-                except Exception as e:
-                    logging.error(f'Error at copy sheets {sheet_id} for user {user_id[0]}. Error: {e}')
-                    error_copy_to_spreadsheet = True
-                    break
-                else:
-                    sheets_name.update({response['sheetId']: response['title'].replace('Копія аркуша ', '')})
-
-            if error_copy_to_spreadsheet:
+            if not self.copy_model_sheets(user_id, new_spreadsheet_id, self.model_sheets_id + self.data_sheets_id):
                 continue
+
+            # open permission
+            try:
+                self.drive_service.permissions().create(
+                    fileId=new_spreadsheet_id,
+                    body={'type': 'anyone', 'role': 'writer'},
+                    fields='*'
+                ).execute()
+            except Exception as e:
+                logging.error(f'Error opening access rightsfor user {user_id}. Error: {e}')
+                continue
+
+            if not db.set_google_sheets_id(user_id, spreadsheet_url):
+                logging.error(f'Error set google sheets id for user {user_id}. Error: {e}')
+
+    def copy_model_sheets(self, user_id, spreadsheet_id, sheets_id, dell_sheet1=False):
+        # copy to spreadsheet
+        request_body = {
+            'destinationSpreadsheetId': spreadsheet_id
+        }
+        sheets_name = {}
+        error_copy_to_spreadsheet = None
+        for sheet_id in sheets_id:
+            try:
+                request = self.service.spreadsheets().sheets().copyTo(spreadsheetId=self.model_spreadsheet_id,
+                                                                      sheetId=sheet_id,
+                                                                      body=request_body)
+                response = request.execute()
+            except Exception as e:
+                logging.error(f'Error at copy sheets {sheet_id} for user {user_id}. Error: {e}')
+                error_copy_to_spreadsheet = True
+                continue
+            else:
+                sheets_name.update(
+                    {response['sheetId']: response['title'].replace('Копія аркуша ', '').replace(' (копия)', '')})
 
             # rename sheets
             request_body = {
@@ -118,30 +145,24 @@ class SheetsApi:
                         'fields': '*'
                     },
                 })
-            request_body['requests'].append({
-                'deleteSheet': {
-                    'sheetId': 0
-                }
-            })
+            if dell_sheet1:
+                request_body['requests'].append({
+                    'deleteSheet': {
+                        'sheetId': 0
+                    }
+                })
             try:
-                self.service.spreadsheets().batchUpdate(spreadsheetId=new_spreadsheet_id,
+                self.service.spreadsheets().batchUpdate(spreadsheetId=spreadsheet_id,
                                                         body=request_body).execute()
             except Exception as e:
-                logging.error(f'Error at rename sheets and delete sheet1 for user {user_id[0]}. Error: {e}')
+                logging.error(f'Error at rename sheets and delete sheet1 for user {user_id}. Error: {e}')
 
-            # open permission
-            try:
-                self.driveService.permissions().create(
-                    fileId=new_spreadsheet_id,
-                    body={'type': 'anyone', 'role': 'writer'},
-                    fields='*'
-                ).execute()
-            except Exception as e:
-                logging.error(f'Error opening access rightsfor user {user_id[0]}. Error: {e}')
-                continue
+            if not error_copy_to_spreadsheet:
+                for sheet_id, sheet_name in sheets_name.items():
+                    if sheet_name == 'Data':
+                        print('Здксь установлю id в бд:', sheet_id)
 
-            if not db.set_google_sheets_id(spreadsheet_url, user_id[0]):
-                logging.error(f'Error set google sheets id for user {user_id[0]}. Error: {e}')
+        return True if not error_copy_to_spreadsheet else False
 
     @staticmethod
     def encrypt(data):
@@ -158,40 +179,74 @@ class SheetsApi:
         return cipher.decrypt(data.encode('utf-8')).decode('utf-8')
 
     def add_data(self, db):
-        for i in range(1, 101):
+        users_id = db.add_data_in_sheet()
+        for user_id in users_id:
+            all_data = db.get_data(user_id)
+            added_ids = []
             request_body = {
-                "majorDimension": "ROWS",
-                "range": "Data",
-                "values": [
-                    [
-                        datetime.now().date().strftime('%Y-%m-%d'),
-                        datetime.now().time().strftime('%H:%M:%S'),
-                        20,
-                        'Питание',
-                        None,
-                        34.5 * i,
-                        'Доход'
-                    ]
-                ]
-            }
-            request = self.service.spreadsheets().values().append(
-                spreadsheetId='1x4KvEWVTjONCpBEsleBRGX_EOqhDfiGbDb_aLaOuGO8', range='Data',
-                body=request_body,
-                valueInputOption='USER_ENTERED')
+                'majorDimension': 'ROWS',
+                'range': 'Data',
+                'values': []}
+            for data in all_data:
+                added_ids.append(data[0])
+                date = data[1].strftime('%Y-%m-%d')
+                time = data[1].strftime('%H:%M:%S')
+                week = data[1].isocalendar()[1]
+                category = data[2]
+                subcategory = data[3] if data[3] != 'None' else ''
+                amount = data[4]
+                type_ = 'Доход' if data[5] else 'Расход'
 
-            response = request.execute()
+                request_body['values'].append([date, time, week, category, subcategory, amount, type_])
 
-            pprint(response)
+            spreadsheet_id = db.get_google_sheets_id(user_id)
 
-    def can_connect_sheet(self, db):
-        return True
+            try:
+                request = self.service.spreadsheets().values().append(spreadsheetId=spreadsheet_id, range='Data',
+                                                                      body=request_body,
+                                                                      valueInputOption='USER_ENTERED').execute()
+            except HttpError as e:
+                logging.error(f'Error at add data in sheet_id: {spreadsheet_id} for user {user_id}.\n Error: {e}')
+                continue
+
+
+
+    def change_sheet_id(self, db):
+        users_id = db.change_sheet_id()
+        for user_id in users_id:
+            spreadsheet_id = db.get_google_sheet_id_change(user_id)
+            request = self.service.spreadsheets().get(spreadsheetId=spreadsheet_id)
+            try:
+                response = request.execute()
+            except HttpError as e:
+                error_detail = json.loads(e.content)
+                if error_detail['error']['code'] == 403 and error_detail['error']['status'] == 'PERMISSION_DENIED':
+                    message_text = f'Внимание, таблица не изменена!\n' \
+                                   f'Нет доступа к таблице: https://docs.google.com/spreadsheets/d/{spreadsheet_id}.\n' \
+                                   f'Пожалуйста перейдите по ссылке на вашу таблицу, зайдите в "Настройки Доступа" и ' \
+                                   f'откройте доступ для {self.email_budget_bot}, для того чтоб Budget Bot мог ' \
+                                   f'добавлять новые записи в таблицу, затем снова повторите изменение таблицы ' \
+                                   f'в настройках.'
+                    send_message_telegram(message_text, user_id)
+                    db.reset_google_sheet_id_change(user_id)
+                    continue
+            if 'Data' in (name['properties']['title'] for name in response['sheets']):
+                message_text = f'Внимание, таблица не изменена!\n Уже есть лист Data в таблице: ' \
+                               f'https://docs.google.com/spreadsheets/d/{spreadsheet_id}.\n' \
+                               f'Пожалуйста переименуйте или удалите лист Data затем снова повторите изменение ' \
+                               f'таблицы в настройках.'
+                send_message_telegram(message_text, user_id)
+            else:
+                if self.copy_model_sheets(user_id, spreadsheet_id, self.data_sheets_id):
+                    message_text = f'Таблицв заменена на : https://docs.google.com/spreadsheets/d/{spreadsheet_id}.'
+                    send_message_telegram(message_text, user_id)
 
     def main(self):
         db = DB()
         self.set_service()
-        self.create_sheet(db)
-        # self.can_connect_sheet(db)
-        # self.add_data(db)
+        # self.create_sheet(db)
+        # self.change_sheet_id(db)
+        self.add_data(db)
 
 
 sheet_api = SheetsApi()

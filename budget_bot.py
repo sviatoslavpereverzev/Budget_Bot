@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 import os
+import re
 from telebot import types
+import requests
 import json
 from database import DB
 from datetime import datetime
 import calendar
 import telebot
 from configparser import ConfigParser
+import logging
 
 
 class BudgetBot(telebot.TeleBot):
@@ -318,10 +321,14 @@ class BudgetBot(telebot.TeleBot):
                                            'К примеру: 1 грн 55 копеек нужно накисать как 1.55')
             self.add(message)
         if message.reply_to_message.text.find('Вставьте ссылку на вашу Google таблицу:') != -1:
-            id_sheet = self.db.set_google_sheets_id(message)
+            # Имениьть на set_google_sheet_change
+            print(message)
+            id_sheet = re.findall(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', message.text)
             if id_sheet:
+                self.db.set_google_sheet_id_change(message.from_user.id, id_sheet[0])
                 self.send_message(chat_id=message.chat.id,
-                                  text=f'Заменил ссылку на: https://docs.google.com/spreadsheets/d/{id_sheet}')
+                                  text=f'После проверки подключения ссылка изменится на: '
+                                       f'https://docs.google.com/spreadsheets/d/{id_sheet[0]}')
             else:
                 self.send_message(chat_id=message.chat.id, text='Что-то не так c сылкой.')
 
@@ -356,3 +363,15 @@ class BudgetBot(telebot.TeleBot):
                 self.send_message(chat_id=message.chat.id,
                                   text='Используйте только буквы для названия подкатегории!\n'
                                        'Попробуйте снова.')
+
+
+def send_message_telegram(message, chat_id, subject=''):
+    config = ConfigParser()
+    config.read(os.path.dirname(os.path.abspath(__file__)) + '/app.ini')
+    token = config.get('BUDGET_BOT', 'token')
+    response = requests.post(
+        url='https://api.telegram.org/bot{}/sendMessage'.format(token),
+        data={'chat_id': chat_id, 'text': '{}{}'.format(subject, message)}
+    ).json()
+    if not response['ok']:
+        logging.error(f'Error for send message to :{chat_id}. Error: {response.get("description")}')

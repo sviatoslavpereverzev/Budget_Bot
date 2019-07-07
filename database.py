@@ -113,8 +113,12 @@ class DB:
         try:
             with DB() as db:
                 db.execute(query)
-        except psycopg2.errors.UniqueViolation as e:
-            print(e)
+        except Exception as e:
+            message = 'Error add user in db.'
+            if user_id:
+                message += f'\nUser id: {user_id}'
+            message += f'\n Error: {e}'
+            logging.error(message)
         else:
             # google_sheets_api.create_table()
             return True
@@ -161,15 +165,18 @@ class DB:
             return answer
 
     def set_data_added(self, user_id, message_id, sheet_id):
-        date_add = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        with DB() as db:
-            query = """
-                    UPDATE budget_bot_data 
-                    SET is_add_in_sheet = FALSE , add_in_sheet_id = %s, 
-                    date_add_in_sheet = %s
-                    WHERE message_id in (%s) AND user_id = ;""" % (
-                    sheet_id, date_add, ', '.join(message_id), user_id)
-            db.execute(query)
+        try:
+            date_add = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            with DB() as db:
+                query = "UPDATE budget_bot_data " \
+                        "SET is_add_in_sheet = TRUE , add_in_sheet_id = '%s', date_add_in_sheet = '%s' " \
+                        "WHERE message_id in (%s) AND user_id = %s;" % (
+                            sheet_id, date_add, ', '.join(message_id), user_id)
+                db.execute(query)
+            return True
+        except Exception as e:
+            logging.error(f'Error: {e}')
+            return False
 
     @staticmethod
     def get_category(user_id):

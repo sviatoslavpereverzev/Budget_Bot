@@ -28,6 +28,8 @@ class SheetsApi:
         self.credentials_file = None
         self.service = None
 
+        self.chat_id_error_notification = None
+
         self.model_spreadsheet_id = None
         self.model_sheets_id = None
         self.data_sheets_id = None
@@ -38,6 +40,7 @@ class SheetsApi:
 
     def set_settings(self):
         self.config.read(os.path.dirname(os.path.abspath(__file__)) + '/app.ini')
+        self.chat_id_error_notification = self.config.getint('BUDGET_BOT', 'chat_id_error_notification')
         self.model_spreadsheet_id = self.config.get('SHEETS_API', 'model_spreadsheet_id')
         self.model_sheets_id = [int(sheets_id) for sheets_id in
                                 self.config.get('SHEETS_API', 'model_sheets_id').split(',')]
@@ -179,16 +182,21 @@ class SheetsApi:
         return cipher.decrypt(data.encode('utf-8')).decode('utf-8')
 
     def add_data(self, db):
+        """Added data in google sheet"""
+
         users_id = db.add_data_in_sheet()
         for user_id in users_id:
             all_data = db.get_data(user_id)
+            #  list of all id records that have been added to sheet
             added_ids = []
+
+            # created request
             request_body = {
                 'majorDimension': 'ROWS',
                 'range': 'Data',
                 'values': []}
             for data in all_data:
-                added_ids.append(data[0])
+                added_ids.append(str(data[0]))
                 date = data[1].strftime('%Y-%m-%d')
                 time = data[1].strftime('%H:%M:%S')
                 week = data[1].isocalendar()[1]
@@ -201,6 +209,7 @@ class SheetsApi:
 
             spreadsheet_id = db.get_google_sheets_id(user_id)
 
+            # added data in sheet
             try:
                 request = self.service.spreadsheets().values().append(spreadsheetId=spreadsheet_id, range='Data',
                                                                       body=request_body,
@@ -209,7 +218,12 @@ class SheetsApi:
                 logging.error(f'Error at add data in sheet_id: {spreadsheet_id} for user {user_id}.\n Error: {e}')
                 continue
 
-
+            # market data as added in database
+            if not db.set_data_added(user_id, added_ids, spreadsheet_id):
+                message = f'Error at add data in sheet_id: {spreadsheet_id} for user {user_id}.\n' \
+                          f'Error: Records were not marked as added.'
+                logging.error(message)
+                send_message_telegram('Budget_bot Error,\n' + message, self.chat_id_error_notification)
 
     def change_sheet_id(self, db):
         users_id = db.change_sheet_id()

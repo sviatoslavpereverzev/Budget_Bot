@@ -1,49 +1,56 @@
 # -*- coding: utf-8 -*-
-from setting import *
+import os
 import re
 import json
 import psycopg2
 import logging
+from configparser import ConfigParser
 from datetime import datetime, timedelta
 
-MAXIMUM_NUMBER_CATEGORIES = 15
-MAXIMUM_NUMBER_SUBCATEGORIES = 6
+# подправить категории
+# дописать комментарии
+# удалить лишнее
 
 
 class DB:
+    category = {
+        1: {'name': 'Питание',
+            'subcategories': {1: {'name': 'Продукты'}, 2: {'name': 'Сладкое'}, 3: {'name': 'Прочее'}, },
+            'is_income': False},
+        2: {'name': 'Заведения',
+            'subcategories': {1: {'name': 'Кафе и рестораны'}, 2: {'name': 'Суши'}, 3: {'name': "McDonalds"},
+                              4: {'name': 'Прочее'}}, 'is_income': False},
+        3: {'name': 'Квартира',
+            'subcategories': {1: {'name': 'Аренда'}, 2: {'name': 'Комуналка'}, 3: {'name': 'Прочее'}},
+            'is_income': False},
+        4: {'name': 'Транспорт',
+            'subcategories': {1: {'name': 'Маршрутка'}, 2: {'name': 'Метро'}, 3: {'name': 'Такси'}},
+            'is_income': False},
+        5: {'name': 'Здоровье',
+            'subcategories': {1: {'name': 'Кафе и рестораны'}, 2: {'name': 'Суши'}, 3: {'name': "McDonalds"},
+                              4: {'name': 'Прочее'}}, 'is_income': False},
+        6: {'name': 'Одежда',
+            'subcategories': {1: {'name': 'Одежда'}, 2: {'name': 'Обувь'}, 3: {'name': 'Уход за одеждой'},
+                              4: {'name': 'Прочее'}}, 'is_income': False},
+        7: {'name': 'Гигиена', 'subcategories': {}, 'is_income': False},
+        8: {'name': 'Отдых', 'subcategories': {}, 'is_income': False},
+        9: {'name': 'Спортзал', 'subcategories': {}, 'is_income': False},
+        10: {'name': 'Здоровье', 'subcategories': {}, 'is_income': False},
+        11: {'name': 'Техника', 'subcategories': {}, 'is_income': False},
+        12: {'name': 'Доходы', 'subcategories': {}, 'is_income': True},
+    }
+    finance_category = {1: {'name': 'Зарплата'}, 2: {'name': 'Пасив'}, 3: {'name': 'Прочее'}}
+
     def __init__(self, ):
-        self.category = {
-            1: {'name': 'Питание',
-                'subcategories': {1: {'name': 'Продукты'}, 2: {'name': 'Сладкое'}, 3: {'name': 'Прочее'}, },
-                'is_income': False},
-            2: {'name': 'Заведения',
-                'subcategories': {1: {'name': 'Кафе и рестораны'}, 2: {'name': 'Суши'}, 3: {'name': "McDonalds"},
-                                  4: {'name': 'Прочее'}}, 'is_income': False},
-            3: {'name': 'Квартира',
-                'subcategories': {1: {'name': 'Аренда'}, 2: {'name': 'Комуналка'}, 3: {'name': 'Прочее'}},
-                'is_income': False},
-            4: {'name': 'Транспорт',
-                'subcategories': {1: {'name': 'Маршрутка'}, 2: {'name': 'Метро'}, 3: {'name': 'Такси'}},
-                'is_income': False},
-            5: {'name': 'Здоровье',
-                'subcategories': {1: {'name': 'Кафе и рестораны'}, 2: {'name': 'Суши'}, 3: {'name': "McDonalds"},
-                                  4: {'name': 'Прочее'}}, 'is_income': False},
-            6: {'name': 'Одежда',
-                'subcategories': {1: {'name': 'Одежда'}, 2: {'name': 'Обувь'}, 3: {'name': 'Уход за одеждой'},
-                                  4: {'name': 'Прочее'}}, 'is_income': False},
-            7: {'name': 'Гигиена', 'subcategories': {}, 'is_income': False},
-            8: {'name': 'Отдых', 'subcategories': {}, 'is_income': False},
-            9: {'name': 'Спортзал', 'subcategories': {}, 'is_income': False},
-            10: {'name': 'Здоровье', 'subcategories': {}, 'is_income': False},
-            11: {'name': 'Техника', 'subcategories': {}, 'is_income': False},
-            12: {'name': 'Доходы', 'subcategories': {}, 'is_income': True},
-        }
-        self.finance_category = {1: {'name': 'Зарплата'}, 2: {'name': 'Пасиыв'}, 3: {'name': 'Прочее'}}
+        self.config = ConfigParser()
+        self.config.read(os.path.dirname(os.path.abspath(__file__)) + '/app.ini')
+        self.max_len_category = self.config.getint('BUDGET_BOT', 'max_len_category')
+        self.max_len_subcategory = self.config.getint('BUDGET_BOT', 'max_len_subcategory')
         try:
-            self.connection = psycopg2.connect(database=database,
-                                               host=db_host,
-                                               user=db_user,
-                                               password=db_password,
+            self.connection = psycopg2.connect(database=self.config.getint('DATABASE', 'database'),
+                                               host=self.config.getint('DATABASE', 'db_host'),
+                                               user=self.config.getint('DATABASE', 'db_user'),
+                                               password=self.config.getint('DATABASE', 'db_password'),
                                                port='5432')
             self.connection.autocommit = True
         except Exception as e:
@@ -58,19 +65,19 @@ class DB:
     @staticmethod
     def _create_table_users():
         query = """
-        CREATE TABLE budget_bot_users (
-        user_id INTEGER PRIMARY KEY ,
-        chat_id INTEGER,
-        date_update TIMESTAMP,
-        sheet_id TEXT,
-        category JSON,
-        balance MONEY DEFAULT 0,
-        first_name TEXT,
-        last_name TEXT,
-        username TEXT,
-        language_code TEXT,
-        is_bot BOOL,
-        data_sheet_id TEXT);"""
+            CREATE TABLE budget_bot_users (
+            user_id INTEGER PRIMARY KEY ,
+            chat_id INTEGER,
+            date_update TIMESTAMP,
+            sheet_id TEXT,
+            category JSON,
+            balance MONEY DEFAULT 0,
+            first_name TEXT,
+            last_name TEXT,
+            username TEXT,
+            language_code TEXT,
+            is_bot BOOL,
+            data_sheet_id TEXT);"""
 
         with DB() as db:
             db.execute(query)
@@ -94,11 +101,12 @@ class DB:
         with DB() as db:
             db.execute(query)
 
-    def add_user(self, message):
+    @staticmethod
+    def add_user(message):
         user_id = message.from_user.id
         chat_id = message.chat.id
         date_update = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        category = json.dumps(self.category)
+        category = json.dumps(DB.category)
         first_name = message.from_user.first_name
         last_name = message.from_user.last_name
         username = message.from_user.username
@@ -119,13 +127,8 @@ class DB:
                 message += f'\nUser id: {user_id}'
             message += f'\n Error: {e}'
             logging.error(message)
-        else:
-            # google_sheets_api.create_table()
-            return True
 
     def add_data(self, message):
-        print('add_data')
-
         message_id = message.message_id
         user_id = message.from_user.id
         chat_id = message.chat.id
@@ -141,8 +144,10 @@ class DB:
             if values.get('name') == category.strip():
                 is_income = values.get('is_income')
 
-        values = f"{message_id}, {user_id}, {chat_id}, '{date_add}', '{category}', '{subcategory}',  {amount}, {is_income}"
-        query = "INSERT INTO budget_bot_data (message_id, user_id, chat_id, date_add, category, subcategory, amount, is_income)" \
+        values = f"{message_id}, {user_id}, {chat_id}, '{date_add}', '{category}', " \
+                 f"'{subcategory}',  {amount}, {is_income}"
+        query = "INSERT INTO budget_bot_data (message_id, user_id, chat_id, date_add, category, " \
+                "subcategory, amount, is_income)" \
                 " VALUES ({});".format(values)
 
         try:
@@ -164,7 +169,8 @@ class DB:
                 logging.error('ANSWER ERROR. QUERY: {}'.format(query))
             return answer
 
-    def set_data_added(self, user_id, message_id, sheet_id):
+    @staticmethod
+    def set_data_added(user_id, message_id, sheet_id):
         try:
             date_add = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             with DB() as db:
@@ -191,8 +197,6 @@ class DB:
 
     @staticmethod
     def update_category(user_id, category):
-        print('update_category')
-
         # Нужно обнавлять и дату
         with DB() as db:
             query = "UPDATE budget_bot_users SET category = '{}' WHERE user_id = {} ;".format(json.dumps(category),
@@ -201,16 +205,14 @@ class DB:
 
     def can_add_category(self, user_id):
         category = self.get_category(user_id)
-        return len(category) < MAXIMUM_NUMBER_CATEGORIES
+        return len(category) < self.max_len_category
 
     def can_add_subcategory(self, call):
-        print('can_add_subcategory')
-
         category = self.get_category(call.message.chat.id)
         callback_data = json.loads(call.data)
         category = category.get(callback_data.get('cat'), {})
         subcategory = category.get('subcategories', {})
-        return len(subcategory) < MAXIMUM_NUMBER_SUBCATEGORIES
+        return len(subcategory) < self.max_len_subcategory
 
     @staticmethod
     def get_data_report(time_from, time_to, user_id, is_income, type_data=''):
@@ -285,7 +287,8 @@ class DB:
             message += '-' * 50 + '\n'
             return message
 
-    def get_report_month(self, user_id):
+    @staticmethod
+    def get_report_month(user_id):
         calendar_month = {
             1: 'Январь', 2: 'Февраль', 3: 'Март', 4: 'Апрель', 5: 'Май', 6: 'Июнь', 7: 'Июль', 8: 'Августу',
             9: 'Сентабрь',
@@ -293,11 +296,10 @@ class DB:
         }
         with DB() as db:
             date_from = datetime.now() - timedelta(days=365)
-            query = """
-                SELECT DISTINCT EXTRACT(MONTH FROM date_add), EXTRACT(YEAR FROM date_add)
-                FROM budget_bot_data 
-                WHERE date_add > '%s' AND user_id= %s
-                ORDER BY EXTRACT(MONTH FROM date_add),   EXTRACT(YEAR FROM date_add);""" % \
+            query = "SELECT DISTINCT EXTRACT(MONTH FROM date_add), EXTRACT(YEAR FROM date_add) " \
+                    "FROM budget_bot_data  WHERE date_add > '%s' AND user_id= %s " \
+                    "ORDER BY EXTRACT(MONTH FROM date_add), " \
+                    "EXTRACT(YEAR FROM date_add);" % \
                     (date_from.strftime('%Y-%m-%d %H:%M:%S'), user_id)
             db.execute(query)
             answer = db.fetchall()
@@ -324,8 +326,6 @@ class DB:
         return dict_return
 
     def delete_category(self, message, id_category):
-        print('delete_category')
-
         category = self.get_category(message.chat.id)
         try:
             category.pop(str(id_category))
@@ -335,8 +335,6 @@ class DB:
             return False
 
     def delete_subcategory(self, message, id_category, id_subcategory):
-        print('delete_subcategory')
-
         category = self.get_category(message.from_user.id)
         try:
             category[str(id_category)]['subcategories'].pop(str(id_subcategory))
@@ -346,11 +344,9 @@ class DB:
             return False
 
     def add_category(self, message):
-        print('add_category')
-
         category = self.get_category(message.from_user.id)
         try:
-            can_add_id = ({str(x) for x in range(1, MAXIMUM_NUMBER_CATEGORIES + 1)}).difference(set(category.keys()))
+            can_add_id = ({str(x) for x in range(1, self.max_len_category + 1)}).difference(set(category.keys()))
             if can_add_id:
                 is_income = 'Введите новое имя категории доходов:' == message.reply_to_message.text
                 category.update(
@@ -363,14 +359,12 @@ class DB:
             return False
 
     def add_subcategory(self, message):
-        print('add_subcategory')
-
         category = self.get_category(message.from_user.id)
         try:
             category_name = message.reply_to_message.text.split('.')[0].split(':')[1].strip()
             for key, value in category.items():
                 if value.get('name') == category_name:
-                    can_add_subcategory = ({str(x) for x in range(1, MAXIMUM_NUMBER_SUBCATEGORIES + 1)}).difference(
+                    can_add_subcategory = ({str(x) for x in range(1, self.max_len_subcategory + 1)}).difference(
                         set(value.get('subcategories').keys()))
                     if can_add_subcategory:
                         category[key]['subcategories'].update(
@@ -394,8 +388,6 @@ class DB:
 
     @staticmethod
     def set_google_sheets_id(user_id, id_sheet):
-        print('set_google_sheets_id')
-
         # обновлять дату
         if id_sheet.rfind('https://docs.google.com') != -1:
             id_sheet = re.findall(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', id_sheet)[0]
@@ -421,22 +413,20 @@ class DB:
 
     @staticmethod
     def set_google_sheet_id_change(user_id, id_sheet):
-
         # обновлять дату
         if id_sheet.rfind('https://docs.google.com') != -1:
             id_sheet = re.findall(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', id_sheet)[0]
         if not id_sheet:
             return
         with DB() as db:
-            query = "UPDATE budget_bot_users SET sheet_id_change = '{}' WHERE user_id = {};".format(id_sheet,
-                                                                                                    user_id)
+            query = "UPDATE budget_bot_users SET sheet_id_change = '{}' WHERE user_id = {};".format(id_sheet, user_id)
             db.execute(query)
         return id_sheet
 
     @staticmethod
     def reset_google_sheets_id(user_id):
         with DB() as db:
-            query = "UPDATE budget_bot_users SET sheet_id = NULL WHERE user_id = {};".format(user_id)
+            query = "UPDATE budget_bot_users SET sheet_id = NULL WHERE user_id = %s;" % user_id
             db.execute(query)
 
     @staticmethod
@@ -464,15 +454,18 @@ class DB:
     @staticmethod
     def add_data_in_sheet():
         with DB() as db:
-            query = "SELECT DISTINCT user_id FROM budget_bot_data WHERE is_add_in_sheet IS FALSE;"
+            query = "SELECT DISTINCT data.user_id " \
+                    "FROM budget_bot_data as data INNER JOIN budget_bot_users " \
+                    "ON data.user_id = budget_bot_users.user_id " \
+                    "WHERE is_add_in_sheet IS FALSE AND sheet_id IS NOT NULL;"
             db.execute(query)
             answer = db.fetchall()
         return [user_id[0] for user_id in answer]
 
 
 if __name__ == '__main__':
-    db = DB()
-    db.get_data(529088251)
+    db_ = DB()
+    db_.get_data(529088251)
     # db.get_report_month(529088251)
     # print(db.create_sheets_id())
     # print(db.change_sheet_id())

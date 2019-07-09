@@ -1,15 +1,21 @@
 # -*- coding: utf-8 -*-
 import os
 import re
-from telebot import types
+import logging
 import requests
 import json
-from database import DB
-from datetime import datetime
 import calendar
-import telebot
+from datetime import datetime
 from configparser import ConfigParser
-import logging
+
+import telebot
+from telebot import types
+
+from database import DB
+
+# дописать start и help
+# добавить комментарии
+# проверить текст и отформатировать
 
 
 class BudgetBot(telebot.TeleBot):

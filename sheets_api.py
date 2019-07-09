@@ -1,38 +1,36 @@
 # -*- coding: utf-8 -*-
-from configparser import ConfigParser
 import os
+import logging
+import time
 import json
 import pickle
-import httplib2
-import logging
-from datetime import datetime
+from configparser import ConfigParser
 
 import apiclient.discovery
-from oauth2client.service_account import ServiceAccountCredentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.errors import HttpError
 
-from pprint import pprint
-import pickle
-from datetime import datetime
 from database import DB
-from cryptography.fernet import Fernet
-
 from budget_bot import send_message_telegram
 
 
 class SheetsApi:
     def __init__(self):
         self.scope = ['https://www.googleapis.com/auth/drive']
-        self.credentials_file = None
-        self.service = None
+        self.sheet_service = None
+        self.drive_service = None
 
+        # chat id where bot error messages are sent
         self.chat_id_error_notification = None
 
+        # table ID with templates
         self.model_spreadsheet_id = None
+        # pattern sheet ID list
         self.model_sheets_id = None
+        # ID list Data
         self.data_sheets_id = None
+        # email bot to which to open access to the table
         self.email_budget_bot = None
 
         self.config = ConfigParser()
@@ -48,11 +46,11 @@ class SheetsApi:
         self.email_budget_bot = self.config.get('SHEETS_API', 'email_budget_bot')
 
     def set_service(self):
-        # credentials = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', self.scope)
-        creds = None
+        """ Starting Google Services """
 
-        if os.path.exists('token.pickle'):
-            with open('token.pickle', 'rb') as token:
+        creds = None
+        if os.path.exists(os.path.dirname(os.path.realpath(__file__)) + '/private/token.pickle'):
+            with open(os.path.dirname(os.path.realpath(__file__)) + '/private/token.pickle', 'rb') as token:
                 creds = pickle.load(token)
             # If there are no (valid) credentials available, let the user log in.
 
@@ -61,37 +59,43 @@ class SheetsApi:
                 creds.refresh(Request())
             else:
                 flow = InstalledAppFlow.from_client_secrets_file(
-                    'credentials.json', self.scope)
+                    os.path.dirname(os.path.realpath(__file__)) + '/private/credentials.json', self.scope)
                 creds = flow.run_local_server()
             # Save the credentials for the next run
-            with open('token.pickle', 'wb') as token:
+            with open(os.path.dirname(os.path.realpath(__file__)) + '/private/token.pickle', 'wb') as token:
                 pickle.dump(creds, token)
 
         self.drive_service = apiclient.discovery.build('drive', 'v3', credentials=creds)
-        self.service = apiclient.discovery.build('sheets', 'v4', credentials=creds)
-        pprint(self.service)
+        self.sheet_service = apiclient.discovery.build('sheets', 'v4', credentials=creds)
 
     def create_sheet(self, db):
+        """ Creating a new table for the user and adding necessary sheets """
+
+        # create sheet
         users_id = db.create_sheets_for()
         for user_id in users_id:
             request_body = {
                 'properties': {
-                    'title': self.encrypt(user_id),
+                    'title': f'{str(int(time.time()))}_{str(user_id)}',
                     'locale': 'uk',
                     'timeZone': 'Europe/Kiev'
                 }
             }
             try:
-                request = self.service.spreadsheets().create(body=request_body)
+                request = self.sheet_service.spreadsheets().create(body=request_body)
                 response = request.execute()
-            except Exception as e:
+            except HttpError as e:
                 logging.error(f'Error create spreadsheet for user {user_id}. Error: {e}')
                 continue
 
             new_spreadsheet_id = response['spreadsheetId']
             spreadsheet_url = response['spreadsheetUrl']
 
-            if not self.copy_model_sheets(user_id, new_spreadsheet_id, self.model_sheets_id + self.data_sheets_id):
+            if not db.set_google_sheets_id(user_id, spreadsheet_url):
+                logging.error(f'Error set google sheets id for user {user_id}. Error: {e}')
+
+            if not self.copy_model_sheets(user_id, new_spreadsheet_id, self.model_sheets_id + self.data_sheets_id,
+                                          dell_sheet1=True):
                 continue
 
             # open permission
@@ -101,27 +105,25 @@ class SheetsApi:
                     body={'type': 'anyone', 'role': 'writer'},
                     fields='*'
                 ).execute()
-            except Exception as e:
+            except HttpError as e:
                 logging.error(f'Error opening access rightsfor user {user_id}. Error: {e}')
                 continue
 
-            if not db.set_google_sheets_id(user_id, spreadsheet_url):
-                logging.error(f'Error set google sheets id for user {user_id}. Error: {e}')
-
     def copy_model_sheets(self, user_id, spreadsheet_id, sheets_id, dell_sheet1=False):
-        # copy to spreadsheet
-        request_body = {
+        """ Copy sheets from the base model """
+
+        request_body_copy = {
             'destinationSpreadsheetId': spreadsheet_id
         }
         sheets_name = {}
         error_copy_to_spreadsheet = None
         for sheet_id in sheets_id:
             try:
-                request = self.service.spreadsheets().sheets().copyTo(spreadsheetId=self.model_spreadsheet_id,
-                                                                      sheetId=sheet_id,
-                                                                      body=request_body)
+                request = self.sheet_service.spreadsheets().sheets().copyTo(spreadsheetId=self.model_spreadsheet_id,
+                                                                            sheetId=sheet_id,
+                                                                            body=request_body_copy)
                 response = request.execute()
-            except Exception as e:
+            except HttpError as e:
                 logging.error(f'Error at copy sheets {sheet_id} for user {user_id}. Error: {e}')
                 error_copy_to_spreadsheet = True
                 continue
@@ -134,11 +136,11 @@ class SheetsApi:
                 'requests': [
                 ]
             }
-            for sheet_id, sheet_name in sheets_name.items():
+            for sheet, sheet_name in sheets_name.items():
                 request_body['requests'].append({
                     'updateSheetProperties': {
                         'properties': {
-                            'sheetId': sheet_id,
+                            'sheetId': sheet,
                             'title': sheet_name,
                             'gridProperties': {
                                 'columnCount': 26,
@@ -148,38 +150,22 @@ class SheetsApi:
                         'fields': '*'
                     },
                 })
+
+            # delete first sheet
             if dell_sheet1:
                 request_body['requests'].append({
                     'deleteSheet': {
                         'sheetId': 0
                     }
                 })
+                dell_sheet1 = False
             try:
-                self.service.spreadsheets().batchUpdate(spreadsheetId=spreadsheet_id,
-                                                        body=request_body).execute()
-            except Exception as e:
+                self.sheet_service.spreadsheets().batchUpdate(spreadsheetId=spreadsheet_id,
+                                                              body=request_body).execute()
+            except HttpError as e:
                 logging.error(f'Error at rename sheets and delete sheet1 for user {user_id}. Error: {e}')
 
-            if not error_copy_to_spreadsheet:
-                for sheet_id, sheet_name in sheets_name.items():
-                    if sheet_name == 'Data':
-                        print('Здксь установлю id в бд:', sheet_id)
-
         return True if not error_copy_to_spreadsheet else False
-
-    @staticmethod
-    def encrypt(data):
-        with open(os.path.dirname(os.path.realpath(__file__)) + '/private/key_for_name.txt') as file:
-            key = file.read().encode('utf-8')
-        cipher = Fernet(key)
-        return cipher.encrypt(str(data).encode('utf-8')).decode('utf-8')
-
-    @staticmethod
-    def decrypt(data):
-        with open(os.path.dirname(os.path.realpath(__file__)) + '/private/key_for_name.txt') as file:
-            key = file.read().encode('utf-8')
-        cipher = Fernet(key)
-        return cipher.decrypt(data.encode('utf-8')).decode('utf-8')
 
     def add_data(self, db):
         """Added data in google sheet"""
@@ -211,12 +197,25 @@ class SheetsApi:
 
             # added data in sheet
             try:
-                request = self.service.spreadsheets().values().append(spreadsheetId=spreadsheet_id, range='Data',
-                                                                      body=request_body,
-                                                                      valueInputOption='USER_ENTERED').execute()
+                request = self.sheet_service.spreadsheets().values().append(spreadsheetId=spreadsheet_id, range='Data',
+                                                                            body=request_body,
+                                                                            valueInputOption='USER_ENTERED').execute()
             except HttpError as e:
-                logging.error(f'Error at add data in sheet_id: {spreadsheet_id} for user {user_id}.\n Error: {e}')
-                continue
+                logging.error(f'Error at add data in sheet_id: {spreadsheet_id} for user {user_id}.\n Error: {e}\n'
+                              f'Error detail: {e.content.decode("utf-8")}')
+
+                error_detail = json.loads(e.content)
+                if error_detail['error']['errors'][0]['message'] == 'Unable to parse range: Data':
+                    if self.copy_model_sheets(user_id, spreadsheet_id, self.data_sheets_id):
+                        message_text = f'Создан новый листа Data в таблице: ' \
+                                       f'https://docs.google.com/spreadsheets/d/{spreadsheet_id}.\n' \
+                                       f'Пожалуйста не удаляйте и не переименовывайте этот лист.'
+                        send_message_telegram(message_text, user_id)
+                    else:
+                        send_message_telegram('Budget_bot Error,\n Error:' + e.content.decode('utf-8'),
+                                              self.chat_id_error_notification)
+                        logging.error('Budget_bot Error,\n Error:' + e.content.decode('utf-8'))
+                    continue
 
             # market data as added in database
             if not db.set_data_added(user_id, added_ids, spreadsheet_id):
@@ -226,11 +225,15 @@ class SheetsApi:
                 send_message_telegram('Budget_bot Error,\n' + message, self.chat_id_error_notification)
 
     def change_sheet_id(self, db):
+        """ Change one table to another """
+
         users_id = db.change_sheet_id()
         for user_id in users_id:
             spreadsheet_id = db.get_google_sheet_id_change(user_id)
-            request = self.service.spreadsheets().get(spreadsheetId=spreadsheet_id)
+
+            # access check
             try:
+                request = self.sheet_service.spreadsheets().get(spreadsheetId=spreadsheet_id)
                 response = request.execute()
             except HttpError as e:
                 error_detail = json.loads(e.content)
@@ -244,31 +247,34 @@ class SheetsApi:
                     send_message_telegram(message_text, user_id)
                     db.reset_google_sheet_id_change(user_id)
                     continue
+
+            # data sheet check
             if 'Data' in (name['properties']['title'] for name in response['sheets']):
                 message_text = f'Внимание, таблица не изменена!\n Уже есть лист Data в таблице: ' \
                                f'https://docs.google.com/spreadsheets/d/{spreadsheet_id}.\n' \
                                f'Пожалуйста переименуйте или удалите лист Data затем снова повторите изменение ' \
                                f'таблицы в настройках.'
                 send_message_telegram(message_text, user_id)
+                db.reset_google_sheet_id_change(user_id)
             else:
                 if self.copy_model_sheets(user_id, spreadsheet_id, self.data_sheets_id):
-                    message_text = f'Таблицв заменена на : https://docs.google.com/spreadsheets/d/{spreadsheet_id}.'
-                    send_message_telegram(message_text, user_id)
+                    if db.set_google_sheets_id(user_id, spreadsheet_id):
+                        message_text = f'Таблицв заменена на : https://docs.google.com/spreadsheets/d/{spreadsheet_id}.'
+                        db.reset_google_sheet_id_change(user_id)
+                        send_message_telegram(message_text, user_id)
+                    else:
+                        logging.error(f'Ошибка при изменении таблицы {spreadsheet_id}')
 
     def main(self):
         db = DB()
         self.set_service()
-        # self.create_sheet(db)
-        # self.change_sheet_id(db)
-        self.add_data(db)
+        while True:
+            self.create_sheet(db)
+            self.change_sheet_id(db)
+            self.add_data(db)
+            time.sleep(0.2)
 
 
-sheet_api = SheetsApi()
-sheet_api.main()
-# x = sheet_api.encrypt(529088251)
-# print(x)
-# print(sheet_api.decrypt(x))
-# sheet_api.set_service()
-# # sheet_api.create_sheet()
-# sheet_api.set_service()
-# sheet_api.add_data('')
+if __name__ == '__main__':
+    sheet_api = SheetsApi()
+    sheet_api.main()

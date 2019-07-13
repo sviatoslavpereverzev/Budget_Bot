@@ -46,7 +46,7 @@ class SheetsApi:
         self.email_budget_bot = self.config.get('SHEETS_API', 'email_budget_bot')
 
     def set_service(self):
-        """ Starting Google Services """
+        """Starting Google Services"""
 
         creds = None
         if os.path.exists(os.path.dirname(os.path.realpath(__file__)) + '/private/token.pickle'):
@@ -69,7 +69,7 @@ class SheetsApi:
         self.sheet_service = apiclient.discovery.build('sheets', 'v4', credentials=creds)
 
     def create_sheet(self, db):
-        """ Creating a new table for the user and adding necessary sheets """
+        """Creating a new table for the user and adding necessary sheets"""
 
         # create sheet
         users_id = db.create_sheets_for()
@@ -105,12 +105,14 @@ class SheetsApi:
                     body={'type': 'anyone', 'role': 'writer'},
                     fields='*'
                 ).execute()
+                message_text = f'Для вас созданна новая таблица:\n{spreadsheet_url}\n'
+                send_message_telegram(message_text, user_id)
             except HttpError as e:
                 logging.error(f'Error opening access rightsfor user {user_id}. Error: {e}')
                 continue
 
     def copy_model_sheets(self, user_id, spreadsheet_id, sheets_id, dell_sheet1=False):
-        """ Copy sheets from the base model """
+        """Copy sheets from the base model"""
 
         request_body_copy = {
             'destinationSpreadsheetId': spreadsheet_id
@@ -219,13 +221,13 @@ class SheetsApi:
 
             # market data as added in database
             if not db.set_data_added(user_id, added_ids, spreadsheet_id):
-                message = f'Error at add data in sheet_id: {spreadsheet_id} for user {user_id}.\n' \
-                          f'Error: Records were not marked as added.'
-                logging.error(message)
-                send_message_telegram('Budget_bot Error,\n' + message, self.chat_id_error_notification)
+                message_text = f'Error at add data in sheet_id: {spreadsheet_id} for user {user_id}.\n' \
+                               f'Error: Records were not marked as added.'
+                logging.error(message_text)
+                send_message_telegram('Budget_bot Error,\n' + message_text, self.chat_id_error_notification)
 
     def change_sheet_id(self, db):
-        """ Change one table to another """
+        """Change one table to another"""
 
         users_id = db.change_sheet_id()
         for user_id in users_id:
@@ -241,9 +243,9 @@ class SheetsApi:
                     message_text = f'Внимание, таблица не изменена!\n' \
                                    f'Нет доступа к таблице: https://docs.google.com/spreadsheets/d/{spreadsheet_id}.\n' \
                                    f'Пожалуйста перейдите по ссылке на вашу таблицу, зайдите в "Настройки Доступа" и ' \
-                                   f'откройте доступ для {self.email_budget_bot}, для того чтоб Budget Bot мог ' \
-                                   f'добавлять новые записи в таблицу, затем снова повторите изменение таблицы ' \
-                                   f'в настройках.'
+                                   f'откройте доступ на редавкирование для {self.email_budget_bot}, для того чтоб ' \
+                                   f'Budget Bot мог добавлять новые записи в таблицу, затем снова повторите ' \
+                                   f'изменение таблицы в настройках.'
                     send_message_telegram(message_text, user_id)
                     db.reset_google_sheet_id_change(user_id)
                     continue
@@ -266,6 +268,7 @@ class SheetsApi:
                         logging.error(f'Ошибка при изменении таблицы {spreadsheet_id}')
 
     def main(self):
+        logging.error('Start Sheet API')
         db = DB()
         self.set_service()
         while True:

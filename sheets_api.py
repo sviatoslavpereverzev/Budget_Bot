@@ -37,7 +37,7 @@ class SheetsApi:
         self.set_settings()
 
     def set_settings(self):
-        self.config.read(os.path.dirname(os.path.abspath(__file__)) + '/app.ini')
+        self.config.read(os.path.dirname(os.path.abspath(__file__)) + '/config/app.ini')
         self.chat_id_error_notification = self.config.getint('BUDGET_BOT', 'chat_id_error_notification')
         self.model_spreadsheet_id = self.config.get('SHEETS_API', 'model_spreadsheet_id')
         self.model_sheets_id = [int(sheets_id) for sheets_id in
@@ -94,7 +94,8 @@ class SheetsApi:
             if not db.set_google_sheets_id(user_id, spreadsheet_url):
                 logging.error(f'Error set google sheets id for user {user_id}. Error: {e}')
 
-            if not self.copy_model_sheets(user_id, new_spreadsheet_id, self.model_sheets_id + self.data_sheets_id,
+            # list Data must create first
+            if not self.copy_model_sheets(user_id, new_spreadsheet_id, self.data_sheets_id + self.model_sheets_id,
                                           dell_sheet1=True):
                 continue
 
@@ -135,6 +136,8 @@ class SheetsApi:
 
             # rename sheets
             request_body = {
+                'includeSpreadsheetInResponse': True,
+                'responseIncludeGridData': True,
                 'requests': [
                 ]
             }
@@ -183,17 +186,32 @@ class SheetsApi:
                 'majorDimension': 'ROWS',
                 'range': 'Data',
                 'values': []}
+
+            # message_id, date_create, category, subcategory, amount, description, is_income, balance, card_balance
             for data in all_data:
                 added_ids.append(str(data[0]))
-                date = data[1].strftime('%Y-%m-%d')
-                time = data[1].strftime('%H:%M:%S')
+                year = data[1].strftime('%Y')
+                month = data[1].strftime('%m')
+                day = data[1].strftime('%d')
                 week = data[1].isocalendar()[1]
-                category = data[2]
-                subcategory = data[3] if data[3] != 'None' else ''
-                amount = data[4]
-                type_ = 'Доход' if data[5] else 'Расход'
+                time = data[1].strftime('%H:%M:%S')
+                category = str(data[2]).strip()
+                subcategory = str(data[3]).strip() if data[3] and data[3] != 'None' else ''
+                amount = ('%.2f' % float(data[4] / 100)).replace('.', ',')
+                description = data[5] if data[5] != 'None' else ''
+                type_ = 'Доход' if data[6] else 'Расход'
+                try:
+                    balance = str(int(float(data[7]) / 100))
+                except:
+                    balance = ''
+                try:
+                    card_balance = str(int(float(data[8]) / 100))
+                except:
+                    card_balance = ''
 
-                request_body['values'].append([date, time, week, category, subcategory, amount, type_])
+                request_body['values'].append(
+                    [year, month, day, week, time, category, subcategory, amount, type_, description, balance,
+                     card_balance])
 
             spreadsheet_id = db.get_google_sheets_id(user_id)
 
@@ -201,7 +219,8 @@ class SheetsApi:
             try:
                 request = self.sheet_service.spreadsheets().values().append(spreadsheetId=spreadsheet_id, range='Data',
                                                                             body=request_body,
-                                                                            valueInputOption='USER_ENTERED').execute()
+                                                                            valueInputOption='USER_ENTERED',
+                                                                            insertDataOption='INSERT_ROWS').execute()
             except HttpError as e:
                 logging.error(f'Error at add data in sheet_id: {spreadsheet_id} for user {user_id}.\n Error: {e}\n'
                               f'Error detail: {e.content.decode("utf-8")}')

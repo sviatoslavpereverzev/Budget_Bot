@@ -10,6 +10,11 @@ from sheets_api import SheetsApi
 
 sheet_api = SheetsApi()
 bot = BudgetBot()
+bot.remove_webhook()
+import time
+
+time.sleep(1)
+import telebot
 
 
 @bot.message_handler(commands=['add'])
@@ -20,6 +25,11 @@ def add(message):
 @bot.message_handler(commands=['settings'])
 def settings(message):
     bot.settings(message)
+
+
+@bot.message_handler(commands=['setbalance'])
+def set_balance(message):
+    bot.balance(message)
 
 
 @bot.message_handler(commands=['report'])

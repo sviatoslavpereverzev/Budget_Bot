@@ -17,7 +17,6 @@ from encryption import encrypt
 
 
 # дописать help_data
-# придумать как добавлять описание для транзакций из бота
 # добавить версию приложения
 
 
@@ -41,6 +40,8 @@ class BudgetBot(telebot.TeleBot):
         self.max_len_category = None
         # maximum length of subcategory name
         self.max_len_subcategory = None
+        # maximum length of discription for transaction
+        self.max_len_description = None
 
         # email bot to which to open access to the table
         self.email_budget_bot = None
@@ -107,21 +108,16 @@ class BudgetBot(telebot.TeleBot):
         self.delete_message(chat_id=message.chat.id, message_id=message.message_id)
         data = json.dumps({'f': 'set_stng'})
         buttons_name = {1: 'Добавить', 2: 'Удалить', 3: 'Получить ссылку на Google таблицу',
-                        4: 'Изменить ссылку на Google таблицу', 5: 'Оповещения от Monobank', }
+                        4: 'Изменить ссылку на Google таблицу', 5: 'Оповещения от Monobank', 6: 'Установить баланс'}
         self.keyboard(message.chat.id, 'Выбери настройки:', buttons_name, callback_key='ct', previous_data=data,
                       qt_key=1, )
-
-    def balance(self, message):
-        self.delete_message(chat_id=message.chat.id, message_id=message.message_id)
-        data = json.dumps({'f': 'bal'})
-        balance_categories = self.db.get_balance_categories(message.from_user.id)
 
     def report(self, message):
         """Select report categories"""
 
         self.delete_message(chat_id=message.chat.id, message_id=message.message_id)
         data = json.dumps({'f': 'get_rp'})
-        buttons_name = {1: 'День', 2: 'Неделя', 3: 'Месяц', 4: 'Определенный месяц'}
+        buttons_name = {1: 'День', 2: 'Неделя', 3: 'Месяц', 4: 'Определенный месяц', 5: 'Получить баланс'}
         self.keyboard(message.chat.id, 'Отчет за:', buttons_name, callback_key='ct', previous_data=data, qt_key=1, )
 
     def start(self, message):
@@ -146,7 +142,10 @@ class BudgetBot(telebot.TeleBot):
     def help(self, message):
         """Select categories for help the user"""
 
-        self.delete_message(chat_id=message.chat.id, message_id=message.message_id)
+        try:
+            self.delete_message(chat_id=message.chat.id, message_id=message.message_id)
+        except:
+            pass
         data = json.dumps({'f': 'help'})
         buttons_name = {1: 'Для чего нужен Budget Bot?',
                         2: 'Что он может?',
@@ -212,7 +211,6 @@ class BudgetBot(telebot.TeleBot):
             transaction_id = self.db.add_data_from_api(data_api)
             if not transaction_id:
                 return False
-        # transaction_id = 'LB3UKnw4UQr1Y8k'
 
         if data_api and transaction_id:
             data = json.dumps({'f': 'afa', 'id': transaction_id})
@@ -265,10 +263,15 @@ class BudgetBot(telebot.TeleBot):
                 message_text += subcategory_text
                 transaction_id = callback_data.get('id')
                 self.db.set_transaction_status(transaction_id, 1)
+                amount = self.db.get_amount_transaction(transaction_id)
+                self.db.update_balance(call.from_user.id, abs(amount), amount > 0)
                 self.db.set_category(transaction_id, category_name)
                 if subcategory_name:
                     self.db.set_subcategory(transaction_id, subcategory_name)
-                self.send_message(chat_id=call.message.chat.id, text=f'Добавил:\n{message_text}')
+                balance = self.db.get_balance(call.from_user.id)
+                self.db.set_balance_transaction(transaction_id, balance)
+                message_text = f'Добавил:\n{message_text}\nБаланс: {balance/100} грн.'
+                self.send_message(chat_id=call.message.chat.id, text=message_text)
 
     def set_settings_bot(self, call):
         """Setting user preferences"""
@@ -311,6 +314,11 @@ class BudgetBot(telebot.TeleBot):
                             54: 'Больше информации об оповещениях Monobank'}
             self.keyboard(call.message.chat.id, 'Выберите действие:', buttons_name, callback_key='ct',
                           previous_data=call.data)
+
+        elif func_id == 6:
+            message_text = 'Введите сумму вашего баланса:'
+            self.send_message(chat_id=call.message.chat.id, text=message_text,
+                              reply_markup=types.ForceReply())
 
         elif func_id == 11:
             if self.db.can_add_category(call.from_user.id):
@@ -445,6 +453,10 @@ class BudgetBot(telebot.TeleBot):
             else:
                 exact_month = callback_data.get('date')
                 self.prepare_report(call, exact_month=exact_month)
+        if report_for == 5:
+            balance = self.db.get_balance(call.from_user.id)
+            self.send_message(chat_id=call.message.chat.id,
+                              text=f'Баланс: {balance/100} грн.')
 
         elif report_for != '99':
             self.prepare_report(call, report_for)
@@ -556,11 +568,13 @@ class BudgetBot(telebot.TeleBot):
                                 self.send_message(chat_id=message.chat.id,
                                                   text='Слишком большая длина описания.')
                                 return
-
-                            if self.db.add_data(message, description):
+                            balance = self.db.add_data(message, description)
+                            if balance:
                                 message_text = f'Добавил:\n{message.reply_to_message.text} {message_amount} грн.'
                                 if description:
                                     message_text += f'\nОписание: {description}.'
+                                if balance:
+                                    message_text += f'\nБаланс: {balance/100} грн.'
                                 self.send_message(chat_id=message.chat.id,
                                                   text=message_text)
                             else:
@@ -631,6 +645,24 @@ class BudgetBot(telebot.TeleBot):
                                 message_text = 'Видимо у меня проблемы, попробуй позже'
                                 self.send_message(chat_id=message.chat.id, text=message_text)
 
+            if message.reply_to_message.text == 'Введите сумму вашего баланса:':
+                try:
+                    amount = int(float(message.text) * 100)
+                    if abs(amount) < 9223372036854775807:
+                        if self.db.set_balance(message.from_user.id, amount):
+                            self.send_message(chat_id=message.chat.id,
+                                              text=f'Баланс установлен.\nБаланс: {message.text} грн.')
+                        else:
+                            self.send_message(chat_id=message.chat.id,
+                                              text='Видимо у меня проблемы, попробуй позже')
+
+                    else:
+                        self.send_message(chat_id=message.chat.id,
+                                          text='Это слишком большая сумма.')
+                except ValueError as e:
+                    self.send_message(chat_id=message.chat.id,
+                                      text=f'Чет не то с суммой, давай по новой!\n'
+                                           'К примеру: 1 грн 55 копеек нужно накисать как 1.55')
 
         else:
             self.send_message(chat_id=message.chat.id,
@@ -638,7 +670,7 @@ class BudgetBot(telebot.TeleBot):
                                    'Если нужна помощь, попробуй команду  \help.')
 
 
-def  send_message_telegram(message, chat_id, subject=''):
+def send_message_telegram(message, chat_id, subject=''):
     """ Sending messages to the user through requests"""
 
     try:

@@ -27,11 +27,6 @@ def settings(message):
     bot.settings(message)
 
 
-@bot.message_handler(commands=['setbalance'])
-def set_balance(message):
-    bot.balance(message)
-
-
 @bot.message_handler(commands=['report'])
 def report(message):
     bot.report(message)

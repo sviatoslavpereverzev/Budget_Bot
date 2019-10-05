@@ -23,7 +23,6 @@ import telebot
 # добавить поле баланса карты
 
 
-
 class DB:
     """Class to work with Budget Bot database"""
 
@@ -214,18 +213,29 @@ class DB:
             subcategory = text.split('.')[1].split(':')[1]
         else:
             subcategory = None
+
         amount = re.findall(r'\d+[.]\d+|\d+', message.text)[0]
         amount = round(float(amount), 2) * 100
 
+        is_income = None
         for key, values in self.get_category(message.from_user.id).items():
             if values.get('name') == category.strip():
                 is_income = values.get('is_income')
 
-        values = f"{message_id}, {user_id}, {chat_id}, '{date_create}', '{category}', " \
-                 f"'{subcategory}',  {amount}, {is_income}, 1, '{message_id}', '{date_create}', 980, 'bot'"
+        if is_income is not None:
+            self.update_balance(user_id, amount, is_income)
 
-        fields = "message_id, user_id, chat_id, date_create, category, subcategory, amount, is_income, " \
-                 "status, transaction_id, date_update, currency_code, type"
+        balance = self.get_balance(message.from_user.id)
+
+        values = f"{message_id}, {user_id}, {chat_id}, '{date_create}', '{category}', " \
+                 f"{amount}, {is_income}, 1, '{message_id}', '{date_create}', 980, 'bot', {balance}"
+
+        fields = "message_id, user_id, chat_id, date_create, category, amount, is_income, " \
+                 "status, transaction_id, date_update, currency_code, type, balance"
+
+        if subcategory:
+            fields += ', subcategory'
+            values += f", '{subcategory}'"
 
         if description:
             fields += ", description"
@@ -237,13 +247,52 @@ class DB:
         try:
             with DB() as db:
                 db.execute(query)
-                return True
         except Exception as e:
             message = 'Error add data in db.'
             if user_id:
                 message += f'\nUser id: {user_id}'
             message += f'\nError: {e}'
             logging.error(message)
+            return False
+
+        return balance
+
+
+    @staticmethod
+    def set_balance(user_id, amount):
+        query = f"UPDATE budget_bot_users SET balance = {amount} WHERE user_id = {user_id};"
+
+        with DB() as db:
+            db.execute(query)
+            return True
+
+    @staticmethod
+    def get_balance(user_id):
+        query = f"SELECT balance FROM budget_bot_users WHERE user_id = {user_id};"
+        with DB() as db:
+            db.execute(query)
+            answer = db.fetchone()
+            return answer[0]
+
+    @staticmethod
+    def update_balance(user_id, amount, is_income):
+        if is_income:
+            query = f"UPDATE budget_bot_users SET balance = balance + {amount} WHERE user_id = {user_id};"
+        else:
+            query = f"UPDATE budget_bot_users SET balance = balance - {amount} WHERE user_id = {user_id};"
+
+        with DB() as db:
+            db.execute(query)
+            return True
+
+    @staticmethod
+    def set_balance_transaction(id_, amount):
+        query = f"UPDATE budget_bot_data SET balance = {amount} WHERE transaction_id = '{id_}';"
+
+        with DB() as db:
+            db.execute(query)
+            return True
+
 
     @staticmethod
     def add_data_from_api(data):
@@ -284,33 +333,6 @@ class DB:
             logging.error(message)
 
     @staticmethod
-    def add_card(data: dict):
-        keys = ''
-        values = ''
-        for key, value in data.items():
-            if key in ['merchant_id', 'token', 'bank', 'card_number', 'card_name', 'user_name', 'date_create',
-                       'date_update']:
-                keys += f"{key}, "
-                values += f"'{value}', "
-            else:
-                keys += f"{key}, "
-                values += f"{value}, "
-
-        query = "INSERT INTO budget_bot_card (%s) " \
-                "VALUES (%s);" % (keys[:-1], values[:-1])
-
-        try:
-            with DB() as db:
-                db.execute(query)
-                return True
-        except Exception as e:
-            message = 'Error add card in db.'
-            if data.get('user_id'):
-                message += f'\nUser id: {user_id}'
-            message += f'\n Error: {e}'
-            logging.error(message)
-
-    @staticmethod
     def get_new_transaction():
         with DB() as db:
             query = "SELECT id, user_id, chat_id, message_text " \
@@ -326,24 +348,21 @@ class DB:
                 return answer
 
     @staticmethod
-    def get_credit_limit(merchant_id):
-        with DB() as db:
-            query = "SELECT credit_limit " \
-                    "FROM budget_bot_cards " \
-                    "WHERE merchant_id  = '%s'" % merchant_id
-            db.execute(query)
-            answer = db.fetchone()
-            if answer is None:
-                return 0
-            return answer[0]
-
-    @staticmethod
     def set_transaction_status(id_, status):
         with DB() as db:
             query = "UPDATE budget_bot_data " \
                     "SET status = %s" \
                     "WHERE transaction_id = '%s';" % (status, id_)
             db.execute(query)
+
+    @staticmethod
+    def get_amount_transaction(id_):
+        with DB() as db:
+            query = f"SELECT amount, is_income FROM budget_bot_data WHERE transaction_id = '{id_}'"
+            db.execute(query)
+            answer = db.fetchone()
+            return int(answer[0]) if answer[1] else int(answer[0])*(-1)
+
 
     @staticmethod
     def set_category(id_, category):
@@ -721,13 +740,15 @@ if __name__ == '__main__':
     # db_.add_user_()
 
     # b = BudgetBot()
-    print(db_.get_data(529088251))
+    # print(db_.get_data(529088251))
     # print(db_.get_category(529088251))
     # print(db_.is_user(529088251))
     # db.get_report_month(529088251)
     # print(db.create_sheets_id())
     # print(db.change_sheet_id())
-    print(db_.add_data_in_sheet())
+    # print(db_.add_data_in_sheet())
+    # print(db_.get_balance(529088251))
+    print(db_.set_balance_transaction('tXc2UvNSeN7GLKQ', 1000))
     # db.get_report_for_day(529088251)
     # print()
     # db.get_report_for_week(529088251)

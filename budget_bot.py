@@ -18,7 +18,7 @@ from encryption import encrypt
 
 # дописать help_data
 # добавить версию приложения
-
+# исправить Name Error в подкатегориях для транзакций, которые добавляются с моно
 
 class BudgetBot(telebot.TeleBot):
     def __init__(self):

@@ -1,0 +1,16 @@
+[uwsgi]
+module = wsgi:app
+
+http = <localhost>
+
+master = true
+processes = 5
+
+req-logger = <path logs>
+logger = <path logs>
+
+socket = <path socket>
+chmod-socket = 660
+vacuum = true
+
+die-on-term = true

@@ -217,6 +217,6 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG,
                         format=u'%(filename) s[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]: \n%(message)s',
                         filename='%s/logs/budget.log' % dir_path, )
-    # # Start flask server
+    # Start flask server
     app.run(host='0.0.0.0',
             port=8080, )  # ssl_context=(WEBHOOK_SSL_CERT, WEBHOOK_SSL_PRIV), )

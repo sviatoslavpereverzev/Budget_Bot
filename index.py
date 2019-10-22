@@ -1,20 +1,16 @@
 # -*- coding: utf-8 -*-
 import logging
-from threading import Thread
+import time
 
 from budget_bot import BudgetBot
 from sheets_api import SheetsApi
 
 # написать файл README
-# написать обработку исключений и логонизацию так, чтоб бот перезапускался
 
 sheet_api = SheetsApi()
 bot = BudgetBot()
 bot.remove_webhook()
-import time
-
 time.sleep(1)
-import telebot
 
 
 @bot.message_handler(commands=['add'])
@@ -59,12 +55,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    # run_func = [sheet_api.main, main]
-    # run_processes = []
-    # for func in run_func:
-    #     p = Thread(target=func)
-    #     p.start()
-    #     run_processes.append(p)
-    #
-    # for p in run_processes:
-    #     p.join()

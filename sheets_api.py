@@ -95,8 +95,11 @@ class SheetsApi:
                 logging.error(f'Error set google sheets id for user {user_id}. Error: {e}')
 
             # list Data must create first
-            if not self.copy_model_sheets(user_id, new_spreadsheet_id, self.data_sheets_id + self.model_sheets_id,
+            if not self.copy_model_sheets(user_id, new_spreadsheet_id, self.data_sheets_id,
                                           dell_sheet1=True):
+                continue
+
+            if not self.copy_model_sheets(user_id, new_spreadsheet_id, self.model_sheets_id):
                 continue
 
             # open permission
@@ -118,7 +121,7 @@ class SheetsApi:
         request_body_copy = {
             'destinationSpreadsheetId': spreadsheet_id
         }
-        sheets_name = {}
+        sheets_data = {}
         error_copy_to_spreadsheet = None
         for sheet_id in sheets_id:
             try:
@@ -131,44 +134,49 @@ class SheetsApi:
                 error_copy_to_spreadsheet = True
                 continue
             else:
-                sheets_name.update(
-                    {response['sheetId']: response['title'].replace('Копія аркуша ', '').replace(' (копия)', '')})
+                new_sheet_name = response['title'].replace('Копія аркуша ', '').replace(' (копия)', '')
+                column = response['gridProperties']['columnCount']
+                row = response['gridProperties']['rowCount']
+                sheets_data.update(
+                    {response['sheetId']: {'name': new_sheet_name, 'column': column, 'row': row}})
 
-            # rename sheets
-            request_body = {
-                'includeSpreadsheetInResponse': True,
-                'responseIncludeGridData': True,
-                'requests': [
-                ]
-            }
-            for sheet, sheet_name in sheets_name.items():
-                request_body['requests'].append({
-                    'updateSheetProperties': {
-                        'properties': {
-                            'sheetId': sheet,
-                            'title': sheet_name,
-                            'gridProperties': {
-                                'columnCount': 26,
-                                'rowCount': 1000
-                            }
-                        },
-                        'fields': '*'
+        # rename sheets
+        request_body = {
+            'includeSpreadsheetInResponse': True,
+            'responseIncludeGridData': True,
+            'requests': [
+            ]
+        }
+
+        for sheet, data in sheets_data.items():
+            request_body['requests'].append({
+                'updateSheetProperties': {
+                    'properties': {
+                        'sheetId': sheet,
+                        'title': data['name'],
+                        'gridProperties': {
+                            'columnCount': data['column'],
+                            'rowCount': data['row']
+                        }
                     },
-                })
+                    'fields': '*'
+                },
+            })
 
-            # delete first sheet
-            if dell_sheet1:
-                request_body['requests'].append({
-                    'deleteSheet': {
-                        'sheetId': 0
-                    }
-                })
-                dell_sheet1 = False
-            try:
-                self.sheet_service.spreadsheets().batchUpdate(spreadsheetId=spreadsheet_id,
-                                                              body=request_body).execute()
-            except HttpError as e:
-                logging.error(f'Error at rename sheets and delete sheet1 for user {user_id}. Error: {e}')
+        # delete first sheet
+        if dell_sheet1:
+            request_body['requests'].append({
+                'deleteSheet': {
+                    'sheetId': 0
+                }
+            })
+            dell_sheet1 = False
+        try:
+            self.sheet_service.spreadsheets().batchUpdate(spreadsheetId=spreadsheet_id,
+                                                          body=request_body).execute()
+        except HttpError as e:
+            logging.error(f'Error at rename sheets and delete sheet1 for user {user_id}. Error: {e}.'
+                          f'\nRequest body: {request_body}')
 
         return True if not error_copy_to_spreadsheet else False
 

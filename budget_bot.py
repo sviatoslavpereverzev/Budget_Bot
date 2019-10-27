@@ -40,7 +40,7 @@ class BudgetBot(telebot.TeleBot):
         self.max_len_category = None
         # maximum length of subcategory name
         self.max_len_subcategory = None
-        # maximum length of discription for transaction
+        # maximum length of description for transaction
         self.max_len_description = None
 
         # email bot to which to open access to the table

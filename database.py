@@ -14,7 +14,6 @@ import telebot
 # обновлять дату при запросах:
 
 
-
 class DB:
     """Class to work with Budget Bot database"""
 
@@ -249,7 +248,6 @@ class DB:
 
         return balance
 
-
     @staticmethod
     def set_balance(user_id, amount):
         query = f"UPDATE budget_bot_users SET balance = {amount} WHERE user_id = {user_id};"
@@ -284,7 +282,6 @@ class DB:
         with DB() as db:
             db.execute(query)
             return True
-
 
     @staticmethod
     def add_data_from_api(data):
@@ -353,8 +350,7 @@ class DB:
             query = f"SELECT amount, is_income FROM budget_bot_data WHERE transaction_id = '{id_}'"
             db.execute(query)
             answer = db.fetchone()
-            return int(answer[0]) if answer[1] else int(answer[0])*(-1)
-
+            return int(answer[0]) if answer[1] else int(answer[0]) * (-1)
 
     @staticmethod
     def set_category(id_, category):
@@ -724,6 +720,52 @@ class DB:
             db.execute(query)
             answer = db.fetchall()
         return [user_id[0] for user_id in answer]
+
+    @staticmethod
+    def simple_commands(user_id, command):
+        queries = {'balance': f"SELECT balance/100 FROM budget_bot_users WHERE user_id = {user_id};",
+                   'year_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                                    f"extract(year from date_create) = extract(year from current_date) "
+                                    f"AND is_income = false AND user_id = {user_id}",
+                   'year_income': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                                  f"extract(year from date_create) = extract(year from current_date) "
+                                  f"AND is_income = true AND user_id = {user_id}",
+                   'previous_year_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                                             f"extract(year from date_create) = extract(year from current_date) -1"
+                                             f"AND is_income = false AND user_id = {user_id}",
+                   'previous_year_income': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                                           f"extract(year from date_create) = extract(year from current_date) -1"
+                                           f"AND is_income = true AND user_id = {user_id}",
+                   'monthly_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                                       f"extract(month from date_create) = extract(month from current_date) "
+                                       f"AND is_income = false AND user_id = {user_id}",
+                   'monthly_income': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                                     f"extract(month from date_create) = extract(month from current_date) "
+                                     f"AND is_income = true AND user_id = {user_id}",
+                   'previous_monthly_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                                                f"extract(month from date_create) = extract(month from current_date) -1"
+                                                f"AND is_income = false AND user_id = {user_id}",
+                   'previous_monthly_income': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                                              f"extract(month from date_create) = extract(month from current_date) -1"
+                                              f"AND is_income = true AND user_id = {user_id}",
+                   'week_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                                    f"extract(week from date_create) = extract(week from current_date) "
+                                    f"AND is_income = false AND user_id = {user_id}",
+                   'week_income': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                                  f"extract(month from date_create) = extract(month from current_date) "
+                                  f"AND is_income = true AND user_id = {user_id}",
+                   'previous_week_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                                             f"extract(week from date_create) = extract(week from current_date) -1"
+                                             f"AND is_income = false AND user_id = {user_id}",
+                   'previous_week_income': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                                           f"extract(month from date_create) = extract(month from current_date) -1"
+                                           f"AND is_income = true AND user_id = {user_id}"
+                   }
+        query = queries.get(command)
+        if query:
+            with DB() as db:
+                db.execute(query)
+                return db.fetchone()[0]
 
 
 if __name__ == '__main__':

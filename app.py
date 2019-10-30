@@ -8,6 +8,7 @@ import json
 import flask
 import telebot
 from configparser import ConfigParser
+from flask import jsonify
 
 from encryption import decrypt
 from budget_bot import BudgetBot, send_message_telegram
@@ -20,41 +21,21 @@ API_TOKEN = config.get('BUDGET_BOT', 'token')
 WEBHOOK_HOST = config.get('FLASK', 'webhook_host')
 WEBHOOK_PORT = config.get('FLASK', 'webhook_port')
 WEBHOOK_LISTEN = config.get('FLASK', 'webhook_listen')
-WEBHOOK_SSL_CERT = dir_path + '/private/fullchain.pem'  # config.get('FLASK', 'webhook_ssl_sert')  # Path to the ssl certificate
-WEBHOOK_SSL_PRIV = dir_path + '/private/privkey.pem'  # config.get('FLASK', 'webhook_ssl_priv')  # Path to the ssl private key
+WEBHOOK_SSL_CERT = dir_path + '/private/fullchain.pem'
+WEBHOOK_SSL_PRIV = dir_path + '/private/privkey.pem'
 WEBHOOK_URL_BASE = "https://%s:%s" % (WEBHOOK_HOST, WEBHOOK_PORT)
 WEBHOOK_URL_PATH = "/%s/" % (API_TOKEN)
-# print(WEBHOOK_URL_BASE)
-# print(WEBHOOK_URL_PATH)
-
-# logger = telebot.logger
-# telebot.logger.setLevel(logging.INFO)
 
 bot = BudgetBot()
 app = flask.Flask(__name__)
+
 # Remove webhook, it fails sometimes the set if there is a previous webhook
 bot.remove_webhook()
-
 time.sleep(1)
-# # Set webhook
-# print(WEBHOOK_URL_BASE + WEBHOOK_URL_PATH)
 
+# Set webhook
 WEBHOOK_URL_BASE = "https://budgetbot.site:443"
 bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH)
-
-# WEBHOOK_URL_PATH = "/telegram_bot_webhook/"
-# WEBHOOK_URL = 'https://budgetbot.site/telegram_bot_webhook/'
-# bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH,
-#                 ) #certificate=open('/etc/letsencrypt/live/budgetbot.site/cert.pem', 'r')
-
-# bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH,
-#                 certificate=open('/home/Budget_Bot/private/certificate.pem', 'r'))
-# with open('/etc/letsencrypt/live/budgetbot.site/cert.pem', 'r') as f:
-#     print(f.read())
-
-
-print(WEBHOOK_URL_BASE)
-print(WEBHOOK_URL_PATH)
 
 # Настройки логирования
 os.makedirs(dir_path + '/logs/', exist_ok=True)
@@ -62,14 +43,7 @@ logfile = dir_path + '/logs/main.log'
 logger = logging.getLogger()
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(module)s:%(lineno)s - %(message)s')
 
-if True:  # config.get('api', 'env') == 'PRODUCTION':
-    rotating_logger = TimedRotatingFileHandler(logfile, when='midnight', backupCount=14, encoding='utf8')
-    rotating_logger.setLevel(logging.INFO)
-    rotating_logger.setFormatter(formatter)
-    logger.addHandler(rotating_logger)
 
-
-# Empty webserver index, return nothing, just http 200
 @app.route('/')
 def hello_world():
     return 'Budget App'
@@ -88,6 +62,13 @@ def notification():
     if chat_id and message_text:
         send_message_telegram(str(message_text), str(chat_id))
     return 'OK'
+
+
+@app.route('/simple_commands/v1/<command>/<user_token>', methods=['POST'])
+def simple_commands(command, user_token):
+    answer = bot.simple_commands(command=command, user_token=user_token)
+    if answer is not None:
+        return str(answer)
 
 
 @app.route('/monobank_api/v1/<user_info>', methods=['POST', 'GET', ])
@@ -111,10 +92,10 @@ def mono_api(user_info):
     if flask.request.headers.get('content-type') == 'application/json':
         if flask.request.data:
             request_data = json.loads(flask.request.data)
-            type = request_data.get('type')
-            if type == 'webhook_test':
+            type_request = request_data.get('type')
+            if type_request == 'webhook_test':
                 return json.dumps({'webhook_test': 'Ok'})
-            elif type == 'StatementItem':
+            elif type_request == 'StatementItem':
                 if user_id and chat_id:
                     merchant_id = request_data['data']['account']
                     data_mono = request_data['data']['statementItem']

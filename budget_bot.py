@@ -62,32 +62,24 @@ class BudgetBot(telebot.TeleBot):
         self.email_budget_bot = self.config.get('SHEETS_API', 'email_budget_bot')
         self.chat_id_error_notification = self.config.getint('BUDGET_BOT', 'chat_id_error_notification')
 
-    def keyboard(self, chat_id, message_text, buttons, callback_key, previous_data, qt_key=3, add_cancel=True):
-        """
-        Keyboard for all methods
+    def start(self, message):
+        """Adding a user to the database and welcome with user"""
 
-        Args:
-            chat_id (int): id chat
-            message_text (str): Text above the keyboard
-            buttons (dict): Dictionary of buttons, where the key is the button identifier
-            and the value is the name of the button
-            callback_key (str): Key for keyback button
-            previous_data (json): The date that came and is completed by the callback
-            qt_key (int): Number of buttons in a row
-
-        """
-
-        callback = json.loads(previous_data, encoding='utf-8')
-        if add_cancel:
-            buttons.update({'99': 'Отмена'})
-        list_keys = []
-        keyboard = types.InlineKeyboardMarkup(row_width=qt_key)
-        for button_id, button_name in buttons.items():
-            callback[callback_key] = button_id
-            callback_data_ = json.dumps(callback)
-            list_keys.append(types.InlineKeyboardButton(button_name, callback_data=callback_data_))
-        keyboard.add(*list_keys)
-        self.send_message(int(chat_id), message_text, reply_markup=keyboard)
+        user_name = message.from_user.first_name
+        user_name = '' if not user_name or user_name == 'None' else f', {user_name} '
+        if not self.db.is_user(message.from_user.id):
+            if self.db.add_user(message):
+                message_text = f'Привет{user_name}👋\nBudget Bot поможет тебе контролировать твой бюджет 💸\n' + \
+                               'Все доходы и расходы будут записываться в твою персональную Google Таблицу 😎\n' \
+                               'Ты можешь строить любые графики, таблицы или делать расчеты благодаря данным, ' \
+                               'которые будут в неё автоматически добавляться.\n' \
+                               'Для того чтоб получить больше инфорвации используй команду \help.\n\n' \
+                               'И на последок цитата Дэйва Рэмси:\n' \
+                               '«Или ты будешь управлять своими деньгами, или их отсутствие будет управлять тобой.»'
+                self.send_message(chat_id=message.chat.id, text=message_text)
+        else:
+            message_text = f'И снова привет{user_name}👋\nЕсли тебе нужна помощь используй команду \help.'
+            self.send_message(chat_id=message.chat.id, text=message_text)
 
     def add(self, message):
         """Select categories"""
@@ -120,25 +112,6 @@ class BudgetBot(telebot.TeleBot):
         buttons_name = {1: 'День', 2: 'Неделя', 3: 'Месяц', 4: 'Определенный месяц', 5: 'Получить баланс'}
         self.keyboard(message.chat.id, 'Отчет за:', buttons_name, callback_key='ct', previous_data=data, qt_key=1, )
 
-    def start(self, message):
-        """Adding a user to the database and welcome with user"""
-
-        user_name = message.from_user.first_name
-        user_name = '' if not user_name or user_name == 'None' else f', {user_name} '
-        if not self.db.is_user(message.from_user.id):
-            if self.db.add_user(message):
-                message_text = f'Привет{user_name}👋\nBudget Bot поможет тебе контролировать твой бюджет 💸\n' + \
-                               'Все доходы и расходы будут записываться в твою персональную Google Таблицу 😎\n' \
-                               'Ты можешь строить любые графики, таблицы или делать расчеты благодаря данным, ' \
-                               'которые будут в неё автоматически добавляться.\n' \
-                               'Для того чтоб получить больше инфорвации используй команду \help.\n\n' \
-                               'И на последок цитата Дэйва Рэмси:\n' \
-                               '«Или ты будешь управлять своими деньгами, или их отсутствие будет управлять тобой.»'
-                self.send_message(chat_id=message.chat.id, text=message_text)
-        else:
-            message_text = f'И снова привет{user_name}👋\nЕсли тебе нужна помощь используй команду \help.'
-            self.send_message(chat_id=message.chat.id, text=message_text)
-
     def help(self, message):
         """Select categories for help the user"""
 
@@ -156,6 +129,15 @@ class BudgetBot(telebot.TeleBot):
                         7: 'Получить данные для тех поддержки', }
         self.keyboard(message.chat.id, 'Выбери настройки:', buttons_name, callback_key='id', previous_data=data,
                       qt_key=1, )
+
+    def simple_commands(self, message=None, command=None, user_token=None):
+        if message:
+            pass
+        else:
+            user_id = self.get_user_from_token(user_token)
+            if user_token:
+                answer = self.db.simple_commands(user_id, command)
+                return answer if answer else False
 
     def add_card(self, message):
         self.delete_message(chat_id=message.chat.id, message_id=message.message_id)
@@ -523,6 +505,9 @@ class BudgetBot(telebot.TeleBot):
             message_text = f'Нельзя добавлять больше {self.max_number_subcategories} подкатегорий.'
             self.send_message(chat_id=call.message.chat.id, text=message_text)
 
+    def get_user_from_token(self, user_token):
+        return 529088251
+
     def callback_inline(self, call):
         """Function selection depending on the button pressed"""
 
@@ -668,6 +653,33 @@ class BudgetBot(telebot.TeleBot):
             self.send_message(chat_id=message.chat.id,
                               text='Я не знаю что ты от меня хочешь 🤷🏻‍♂️\n'
                                    'Если нужна помощь, попробуй команду  \help.')
+
+    def keyboard(self, chat_id, message_text, buttons, callback_key, previous_data, qt_key=3, add_cancel=True):
+        """
+        Keyboard for all methods
+
+        Args:
+            chat_id (int): id chat
+            message_text (str): Text above the keyboard
+            buttons (dict): Dictionary of buttons, where the key is the button identifier
+            and the value is the name of the button
+            callback_key (str): Key for keyback button
+            previous_data (json): The date that came and is completed by the callback
+            qt_key (int): Number of buttons in a row
+
+        """
+
+        callback = json.loads(previous_data, encoding='utf-8')
+        if add_cancel:
+            buttons.update({'99': 'Отмена'})
+        list_keys = []
+        keyboard = types.InlineKeyboardMarkup(row_width=qt_key)
+        for button_id, button_name in buttons.items():
+            callback[callback_key] = button_id
+            callback_data_ = json.dumps(callback)
+            list_keys.append(types.InlineKeyboardButton(button_name, callback_data=callback_data_))
+        keyboard.add(*list_keys)
+        self.send_message(int(chat_id), message_text, reply_markup=keyboard)
 
 
 def send_message_telegram(message, chat_id, subject=''):

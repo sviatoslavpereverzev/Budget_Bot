@@ -724,6 +724,10 @@ class DB:
     @staticmethod
     def simple_commands(user_id, command):
         queries = {'balance': f"SELECT balance/100 FROM budget_bot_users WHERE user_id = {user_id};",
+                   'earnings_per_hour': f"SELECT div(SUM(amount/100), 720) FROM budget_bot_data WHERE status = 1 and "
+                                        f"date_create > current_date - 30 AND is_income = true AND user_id = {user_id}",
+                   'cost_per_hour': f"SELECT div(SUM(amount/100), 720) FROM budget_bot_data WHERE status = 1 and "
+                                    f"date_create > current_date - 30 AND is_income = false AND user_id = {user_id}",
                    'year_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
                                     f"extract(year from date_create) = extract(year from current_date) "
                                     f"AND is_income = false AND user_id = {user_id}",
@@ -782,7 +786,8 @@ if __name__ == '__main__':
     # print(db.change_sheet_id())
     # print(db_.add_data_in_sheet())
     # print(db_.get_balance(529088251))
-    print(db_.set_balance_transaction('tXc2UvNSeN7GLKQ', 1000))
+    print(db_.simple_commands(529088251, 'previous_year_income'))
+    # print(db_.set_balance_transaction('tXc2UvNSeN7GLKQ', 1000))
     # db.get_report_for_day(529088251)
     # print()
     # db.get_report_for_week(529088251)

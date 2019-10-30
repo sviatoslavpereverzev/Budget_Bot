@@ -133,11 +133,11 @@ class BudgetBot(telebot.TeleBot):
     def simple_commands(self, message=None, command=None, user_token=None):
         if message:
             pass
-        else:
+        elif command and user_token:
             user_id = self.get_user_from_token(user_token)
-            if user_token:
+            if user_id:
                 answer = self.db.simple_commands(user_id, command)
-                return answer if answer else False
+                return answer
 
     def add_card(self, message):
         self.delete_message(chat_id=message.chat.id, message_id=message.message_id)

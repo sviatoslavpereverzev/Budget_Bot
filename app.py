@@ -67,8 +67,7 @@ def notification():
 @app.route('/simple_commands/v1/<command>/<user_token>', methods=['POST'])
 def simple_commands(command, user_token):
     answer = bot.simple_commands(command=command, user_token=user_token)
-    if answer is not None:
-        return str(answer)
+    return str(answer) if answer else ''
 
 
 @app.route('/monobank_api/v1/<user_info>', methods=['POST', 'GET', ])

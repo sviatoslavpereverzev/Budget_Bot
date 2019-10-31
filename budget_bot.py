@@ -134,7 +134,7 @@ class BudgetBot(telebot.TeleBot):
         if message:
             pass
         elif command and user_token:
-            user_id = self.get_user_from_token(user_token)
+            user_id = self.db.get_user_from_token(user_token)
             if user_id:
                 answer = self.db.simple_commands(user_id, command)
                 return answer
@@ -504,9 +504,6 @@ class BudgetBot(telebot.TeleBot):
         else:
             message_text = f'Нельзя добавлять больше {self.max_number_subcategories} подкатегорий.'
             self.send_message(chat_id=call.message.chat.id, text=message_text)
-
-    def get_user_from_token(self, user_token):
-        return 529088251
 
     def callback_inline(self, call):
         """Function selection depending on the button pressed"""

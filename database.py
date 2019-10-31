@@ -722,6 +722,15 @@ class DB:
         return [user_id[0] for user_id in answer]
 
     @staticmethod
+    def get_user_from_token(token):
+        query = f"SELECT user_id FROM budget_bot_users WHERE token = '{token}'"
+        with DB() as db:
+            db.execute(query)
+            answer = db.fetchone()
+            if answer:
+                return answer[0]
+
+    @staticmethod
     def simple_commands(user_id, command):
         queries = {'balance': f"SELECT balance/100 FROM budget_bot_users WHERE user_id = {user_id};",
                    'earnings_per_hour': f"SELECT div(SUM(amount/100), 720) FROM budget_bot_data WHERE status = 1 and "
@@ -765,11 +774,14 @@ class DB:
                                            f"extract(month from date_create) = extract(month from current_date) -1"
                                            f"AND is_income = true AND user_id = {user_id}"
                    }
-        query = queries.get(command)
-        if query:
-            with DB() as db:
-                db.execute(query)
-                return db.fetchone()[0]
+
+        for key in queries:
+            print(key)
+        # query = queries.get(command)
+        # if query:
+        #     with DB() as db:
+        #         db.execute(query)
+        #         return db.fetchone()[0]
 
 
 if __name__ == '__main__':

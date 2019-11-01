@@ -38,6 +38,11 @@ def help_(message):
     bot.help(message)
 
 
+@bot.message_handler(commands=['command_token'])
+def get_command_token(message):
+    bot.get_command_token(message)
+
+
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
     bot.callback_inline(call)

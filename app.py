@@ -70,7 +70,7 @@ def simple_commands(command, user_info):
     user_id = data.get('user_id')
     answer = ''
     if user_id:
-        answer = bot.simple_commands(command=command, user_id=user_id)
+        answer = str(bot.simple_commands(command=command, user_id=user_id))
     return answer
 
 
@@ -171,6 +171,11 @@ def start(message):
 @bot.message_handler(commands=['help'])
 def help_(message):
     bot.help(message)
+
+
+@bot.message_handler(commands=['command_token'])
+def get_command_token(message):
+    bot.get_command_token(message)
 
 
 @bot.callback_query_handler(func=lambda call: True)

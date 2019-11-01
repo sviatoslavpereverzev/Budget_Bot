@@ -130,6 +130,10 @@ class BudgetBot(telebot.TeleBot):
         self.keyboard(message.chat.id, 'Выбери настройки:', buttons_name, callback_key='id', previous_data=data,
                       qt_key=1, )
 
+    def get_command_token(self, message):
+        token = encrypt(f'user_id:{message.from_user.id};chat_id:{message.chat.id}')
+        self.send_message(chat_id=message.chat.id, text=f'Ваш токен:\n{token}')
+
     def simple_commands(self, message=None, command=None, user_id=None):
         if message:
             pass

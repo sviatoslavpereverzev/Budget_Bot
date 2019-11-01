@@ -130,14 +130,12 @@ class BudgetBot(telebot.TeleBot):
         self.keyboard(message.chat.id, 'Выбери настройки:', buttons_name, callback_key='id', previous_data=data,
                       qt_key=1, )
 
-    def simple_commands(self, message=None, command=None, user_token=None):
+    def simple_commands(self, message=None, command=None, user_id=None):
         if message:
             pass
-        elif command and user_token:
-            user_id = self.db.get_user_from_token(user_token)
-            if user_id:
-                answer = self.db.simple_commands(user_id, command)
-                return answer
+        elif command and user_id:
+            answer = self.db.simple_commands(user_id, command)
+            return answer
 
     def add_card(self, message):
         self.delete_message(chat_id=message.chat.id, message_id=message.message_id)
@@ -698,6 +696,7 @@ def send_message_telegram(message, chat_id, subject=''):
 
 if __name__ == '__main__':
     b = BudgetBot()
+    b.simple_commands(command='balance', user_token='bdfc4ef4-2b98-46f4-aaa2-308172537d1e')
     # b.add_from_api()
     #
     # b.add_from_api('')

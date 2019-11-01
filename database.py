@@ -777,11 +777,11 @@ class DB:
 
         for key in queries:
             print(key)
-        # query = queries.get(command)
-        # if query:
-        #     with DB() as db:
-        #         db.execute(query)
-        #         return db.fetchone()[0]
+        query = queries.get(command)
+        if query:
+            with DB() as db:
+                db.execute(query)
+                return db.fetchone()[0]
 
 
 if __name__ == '__main__':
@@ -798,7 +798,7 @@ if __name__ == '__main__':
     # print(db.change_sheet_id())
     # print(db_.add_data_in_sheet())
     # print(db_.get_balance(529088251))
-    print(db_.simple_commands(529088251, 'previous_year_income'))
+    # print(db_.simple_commands(529088251, 'previous_year_income'))
     # print(db_.set_balance_transaction('tXc2UvNSeN7GLKQ', 1000))
     # db.get_report_for_day(529088251)
     # print()

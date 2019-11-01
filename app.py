@@ -64,10 +64,14 @@ def notification():
     return 'OK'
 
 
-@app.route('/simple_commands/v1/<command>/<user_token>', methods=['POST'])
-def simple_commands(command, user_token):
-    answer = bot.simple_commands(command=command, user_token=user_token)
-    return str(answer) if answer else ''
+@app.route('/simple_commands/v1/<command>/<user_info>', methods=['POST'])
+def simple_commands(command, user_info):
+    data = get_dict_from_encrypt_data(user_info)
+    user_id = data.get('user_id')
+    answer = ''
+    if user_id:
+        answer = bot.simple_commands(command=command, user_id=user_id)
+    return answer
 
 
 @app.route('/monobank_api/v1/<user_info>', methods=['POST', 'GET', ])
@@ -75,15 +79,7 @@ def mono_api(user_info):
     if flask.request.data:
         logging.error('Request: ', json.loads(flask.request.data))
 
-    data = {}
-
-    try:
-        decrypt_data = decrypt(user_info)
-        data = {k: v for k, v in (val.split(':') for val in decrypt_data.split(';'))}
-
-    except:
-        message_text = f'Error decrypt string: {user_info}'
-        send_message_telegram(message_text, bot.chat_id_error_notification)
+    data = get_dict_from_encrypt_data(user_info)
 
     user_id = data.get('user_id')
     chat_id = data.get('chat_id')
@@ -190,6 +186,20 @@ def text(message):
 def main():
     logging.error('Run Budget Bot')
     bot.polling()
+
+
+def get_dict_from_encrypt_data(encrypt_data):
+    data = {}
+
+    try:
+        decrypt_data = decrypt(encrypt_data)
+        data = {k: v for k, v in (val.split(':') for val in decrypt_data.split(';'))}
+
+    except:
+        message_text = f'Error decrypt string: {encrypt_data}'
+        send_message_telegram(message_text, bot.chat_id_error_notification)
+
+    return data
 
 
 if __name__ == '__main__':

@@ -64,14 +64,15 @@ def notification():
     return 'OK'
 
 
-@app.route('/simple_commands/v1/<command>/<user_info>', methods=['POST'])
+@app.route('/simple_commands/v1/<command>/<user_info>')
 def simple_commands(command, user_info):
     data = get_dict_from_encrypt_data(user_info)
     user_id = data.get('user_id')
-    answer = ''
     if user_id:
-        answer = str(bot.simple_commands(command=command, user_id=user_id))
-    return answer
+        answer = bot.simple_commands(command=command, user_id=user_id)
+        return str(answer) if answer else 'Нет данных'
+    else:
+        return 'Ошибка токена'
 
 
 @app.route('/monobank_api/v1/<user_info>', methods=['POST', 'GET', ])

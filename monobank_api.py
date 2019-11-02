@@ -48,6 +48,5 @@ def get_webhook(user_token):
 
 
 def get_currency():
-    header = {'accept': 'application/json', 'Content-Type': 'application/json', }
     response = requests.get('https://api.monobank.ua/bank/currency')
     return json.loads(response.content, encoding='utf-8')

@@ -31,7 +31,7 @@ def get_cost_statement(user_token, time_from, time_to=None, account=0):
 
 def set_webhook(user_token, url):
     header = {'X-Token': user_token, 'accept': 'application/json', 'Content-Type': 'application/json', }
-    data = {"webHookUrl": url}
+    data = {'webHookUrl': url}
     try:
         response = requests.post('https://api.monobank.ua/personal/webhook', data=json.dumps(data), headers=header)
     except:

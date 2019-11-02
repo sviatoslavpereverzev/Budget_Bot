@@ -90,7 +90,7 @@ def mono_api(user_info):
             request_data = json.loads(flask.request.data)
             type_request = request_data.get('type')
             if type_request == 'webhook_test':
-                return json.dumps({'webhook_test': 'Ok'})
+                return jsonify({'webhook_test': True})
             elif type_request == 'StatementItem':
                 if user_id and chat_id:
                     merchant_id = request_data['data']['account']

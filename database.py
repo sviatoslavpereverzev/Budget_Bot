@@ -199,9 +199,9 @@ class DB:
         chat_id = message.chat.id
         date_create = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         text = message.reply_to_message.text
-        category = text.split('.')[0].split(':')[1]
+        category = text.split('.')[0].split(':')[1].strip()
         if text.split('.')[1].rfind('Подкатегория') != -1:
-            subcategory = text.split('.')[1].split(':')[1]
+            subcategory = text.split('.')[1].split(':')[1].strip()
         else:
             subcategory = None
 
@@ -596,7 +596,7 @@ class DB:
             if can_add_id:
                 is_income = 'Введите новое имя категории доходов:' == message.reply_to_message.text
                 category.update(
-                    {min(can_add_id): {'name': f'{message.text}', 'subcategories': {}, 'is_income': is_income}})
+                    {min(can_add_id): {'name': f'{message.text.strip()}', 'subcategories': {}, 'is_income': is_income}})
                 self.update_category(message.from_user.id, category)
                 return True
             else:
@@ -614,7 +614,7 @@ class DB:
                         set(value.get('subcategories').keys()))
                     if can_add_subcategory:
                         category[key]['subcategories'].update(
-                            {f'{min(can_add_subcategory)}': {'name': f'{message.text}'}})
+                            {f'{min(can_add_subcategory)}': {'name': f'{message.text.strip()}'}})
                         self.update_category(message.from_user.id, category)
                         return True
                     else:

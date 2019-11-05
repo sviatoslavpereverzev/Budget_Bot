@@ -444,7 +444,7 @@ class BudgetBot(telebot.TeleBot):
             else:
                 exact_month = callback_data.get('date')
                 self.prepare_report(call, exact_month=exact_month)
-        if report_for == 5:
+        elif report_for == 5:
             balance = self.db.get_balance(call.from_user.id)
             self.send_message(chat_id=call.message.chat.id,
                               text=f'Баланс: {balance/100} грн.')

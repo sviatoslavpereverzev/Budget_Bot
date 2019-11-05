@@ -253,7 +253,7 @@ class BudgetBot(telebot.TeleBot):
                 amount = self.db.get_amount_transaction(transaction_id)
                 self.db.update_balance(call.from_user.id, abs(amount), amount > 0)
                 self.db.set_category(transaction_id, category_name)
-                if subcategory_name:
+                if subcategory_name and subcategory_name != 'Name Error':
                     self.db.set_subcategory(transaction_id, subcategory_name)
                 balance = self.db.get_balance(call.from_user.id)
                 self.db.set_balance_transaction(transaction_id, balance)

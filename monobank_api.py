@@ -8,6 +8,9 @@ def get_user_info(user_token):
     header = {'X-Token': user_token, 'accept': 'application/json', 'Content-Type': 'application/json', }
     response = requests.get('https://api.monobank.ua//personal/client-info', headers=header)
     if not response:
+        if response.status_code == 403 and 'errorDescription' in response.text:
+            return {'error': 'Token Error'}
+
         logging.error('Error get card balance for monobank. Last token symbol: %s' % user_token[-10:])
         if response.content:
             logging.error(response.content.decode('utf-8'))
@@ -44,7 +47,10 @@ def set_webhook(user_token, url):
 def get_webhook(user_token):
     user_info = get_user_info(user_token)
     if user_info:
-        return user_info.get('webHookUrl')
+        if user_info.get('webHookUrl'):
+            return user_info.get('webHookUrl')
+        elif user_info.get('error'):
+            return user_info.get('error')
 
 
 def get_currency():

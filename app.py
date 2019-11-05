@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
 import logging
-from logging.handlers import TimedRotatingFileHandler
 import time
 import datetime
 import json
@@ -23,8 +22,8 @@ WEBHOOK_PORT = config.get('FLASK', 'webhook_port')
 WEBHOOK_LISTEN = config.get('FLASK', 'webhook_listen')
 WEBHOOK_SSL_CERT = dir_path + '/private/fullchain.pem'
 WEBHOOK_SSL_PRIV = dir_path + '/private/privkey.pem'
-WEBHOOK_URL_BASE = "https://%s:%s" % (WEBHOOK_HOST, WEBHOOK_PORT)
-WEBHOOK_URL_PATH = "/%s/" % (API_TOKEN)
+WEBHOOK_URL_BASE = 'https://%s:%s' % (WEBHOOK_HOST, WEBHOOK_PORT)
+WEBHOOK_URL_PATH = '/%s/' % API_TOKEN
 
 bot = BudgetBot()
 app = flask.Flask(__name__)
@@ -34,14 +33,13 @@ bot.remove_webhook()
 time.sleep(1)
 
 # Set webhook
-WEBHOOK_URL_BASE = "https://budgetbot.site:443"
 bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH)
 
 # Настройки логирования
 os.makedirs(dir_path + '/logs/', exist_ok=True)
 logfile = dir_path + '/logs/main.log'
 logger = logging.getLogger()
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(module)s:%(lineno)s - %(message)s')
+formatter = logging.Formatter(u'%(filename) s[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]: \n%(message)s')
 
 
 @app.route('/')
@@ -75,7 +73,7 @@ def simple_commands(command, user_info):
         return 'Ошибка токена'
 
 
-@app.route('/monobank_api/v1/<user_info>', methods=['POST', 'GET', ])
+@app.route('/monobank_api/v1/<user_info>', methods=['POST'])
 def mono_api(user_info):
     if flask.request.data:
         logging.error('Request: ', json.loads(flask.request.data))

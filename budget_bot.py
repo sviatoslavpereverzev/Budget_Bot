@@ -49,6 +49,12 @@ class BudgetBot(telebot.TeleBot):
         # chat id where bot error messages are sent
         self.chat_id_error_notification = None
 
+        # Budget_Bot host
+        self.host = None
+
+        # Version of api client monobank
+        self.monobank_api_version = None
+
         self.set_settings()
 
     def set_settings(self):
@@ -61,6 +67,9 @@ class BudgetBot(telebot.TeleBot):
 
         self.email_budget_bot = self.config.get('SHEETS_API', 'email_budget_bot')
         self.chat_id_error_notification = self.config.getint('BUDGET_BOT', 'chat_id_error_notification')
+
+        self.host = self.config.get('FLASK', 'webhook_host')
+        self.monobank_api_version = self.config.get('BUDGET_BOT', 'monobank_api_version')
 
     def start(self, message):
         """Adding a user to the database and welcome with user"""
@@ -84,10 +93,7 @@ class BudgetBot(telebot.TeleBot):
     def add(self, message):
         """Select categories"""
 
-        try:
-            self.delete_message(chat_id=message.chat.id, message_id=message.message_id)
-        except:
-            pass
+        self.delete_message(chat_id=message.chat.id, message_id=message.message_id)
         data = json.dumps({'f': 'am'})
         categories = self.db.get_category(message.from_user.id)
         buttons_name = {button_id: button_name.get('name', 'Name Error') for button_id, button_name in
@@ -115,10 +121,7 @@ class BudgetBot(telebot.TeleBot):
     def help(self, message):
         """Select categories for help the user"""
 
-        try:
-            self.delete_message(chat_id=message.chat.id, message_id=message.message_id)
-        except:
-            pass
+        self.delete_message(chat_id=message.chat.id, message_id=message.message_id)
         data = json.dumps({'f': 'help'})
         buttons_name = {1: 'Для чего нужен Budget Bot?',
                         2: 'Что он может?',
@@ -536,11 +539,8 @@ class BudgetBot(telebot.TeleBot):
         """Processing text messages from the user and calling certain functions"""
 
         if message.reply_to_message:
-            try:
-                self.delete_message(chat_id=message.chat.id, message_id=message.reply_to_message.message_id)
-                self.delete_message(chat_id=message.chat.id, message_id=message.message_id)
-            except:
-                pass
+            self.delete_message(chat_id=message.chat.id, message_id=message.reply_to_message.message_id)
+            self.delete_message(chat_id=message.chat.id, message_id=message.message_id)
             if message.reply_to_message.text.find('Категория') != -1 and message.reply_to_message.text.find(
                     'Сумма:') != -1:
                 if message.reply_to_message.text.find(' грн.') != -1:
@@ -617,42 +617,43 @@ class BudgetBot(telebot.TeleBot):
                                       text='Что-то не так')
 
             elif message.reply_to_message.text.find('Вставьте ваш токен для проверки оповещений:') != -1:
-                pass
-                #
-                # token = message.text.replace(
-                #     'Перейдите по ссылке https://api.monobank.ua/, авторизируйтесь и скопируйте токен.\n'
-                #     'Вставьте ваш токен для проверки оповещений:', '')
-                # webhook = get_webhook(token)
-                # if webhook:
-                #     header = {'accept': 'application/json', 'Content-Type': 'application/json', }
-                #     response = requests.post(webhook, data=json.dumps({'type': 'webhook_test'}), headers=header)
-                #     response = json.loads(response.content, encoding='utf-8')
-                #     if isinstance(response, dict) and response.get('webhook_test'):
-                #         self.send_message(chat_id=message.chat.id, text='Уведомления включены.')
-                #     else:
-                #         message_text = 'Возможно возникли проблемы на сервере. Попробуйте позже ' \
-                #                        'или напишите в тех поддержку!'
-                #         self.send_message(chat_id=message.chat.id, text=message_text)
-                # else:
-                #     self.send_message(chat_id=message.chat.id, text=str(webhook))
+                token = message.text.split(':')[-1].strip()
+                if token:
+                    webhook = get_webhook(token)
+                    if webhook and webhook != 'Token Error':
+                        if webhook.rfind('https://%s/monobank_api/%s/' % (self.host, self.monobank_api_version)) == -1:
+                            message_text = f'Неверный webhook. У вас установлен webhook: {webhook}.\n' \
+                                           f'Установите оповещения от monobank в настройках еще раз или ' \
+                                           f'напишите в техподдержку'
+                        else:
+                            message_text = 'Уведомления включены.'
+                    elif webhook and webhook == 'Token Error':
+                        message_text = 'Неверный токен.'
+                    else:
+                        message_text = 'Уведомления отключены.'
+                else:
+                    message_text = 'Токен не определен. Попробуйте еще раз или напишите в техподдержку.'
+
+                self.send_message(chat_id=message.chat.id, text=message_text)
 
             elif message.reply_to_message.text.find('Вставьте ваш токен для отмены оповещений:') != -1:
-                pass
+                token = message.text.split(':')[-1].strip()
+                if token:
+                    response = set_webhook(token, '')
+                    message_text = 'Видимо у меня проблемы, попробуй позже'
+                    if isinstance(response, dict):
+                        if response.get('status') == 'ok':
+                            message_text = 'Уведомления отключены.'
+                        elif 'errorDescription' in response:
+                            if response['errorDescription'] == "Unknown 'X-Token'":
+                                message_text = 'Неверный токен.'
+                            else:
+                                message_text = 'Возникла ошибка при запросе к monobank.\n' \
+                                               'Попробуйте еще раз или напишите в техподдержку.'
+                else:
+                    message_text = 'Токен не определен.\nПопробуйте еще раз или напишите в техподдержку.'
 
-                # token = message.text.replace(
-                #     'Перейдите по ссылке https://api.monobank.ua/, авторизируйтесь и скопируйте токен.\n'
-                #     'Вставьте ваш токен для отмены оповещений:', '')
-                # response = set_webhook(token, '')
-                # if isinstance(response, dict):
-                #     if response.get('status') == 'ok':
-                #         self.send_message(chat_id=message.chat.id, text='Уведомления отключены.')
-                #     if 'errorDescription' in response:
-                #         if response['errorDescription'] == "Unknown 'X-Token'":
-                #             message_text = 'Неверный токен!\nПопробуйте ещё раз или восользуйтесь командой \help.'
-                #             self.send_message(chat_id=message.chat.id, text=message_text)
-                #     else:
-                #         message_text = 'Видимо у меня проблемы, попробуй позже'
-                #         self.send_message(chat_id=message.chat.id, text=message_text)
+                self.send_message(chat_id=message.chat.id, text=message_text)
 
             elif message.reply_to_message.text.find('Вставьте полученный токен:') != -1:
                 token = message.text.replace('Вставьте полученный токен:', '')
@@ -665,7 +666,7 @@ class BudgetBot(telebot.TeleBot):
                             self.send_message(chat_id=message.chat.id, text='Уведомления установлены.')
                         if 'errorDescription' in response:
                             if response['errorDescription'] == "Unknown 'X-Token'":
-                                message_text = 'Неверный токен!\nПопробуйте ещё раз или восользуйтесь командой \help.'
+                                message_text = 'Неверный токен.'
                                 self.send_message(chat_id=message.chat.id, text=message_text)
                             else:
                                 message_text = 'Видимо у меня проблемы, попробуй позже'
@@ -722,6 +723,12 @@ class BudgetBot(telebot.TeleBot):
         keyboard.add(*list_keys)
         self.send_message(int(chat_id), message_text, reply_markup=keyboard)
 
+    def delete_message(self, chat_id, message_id):
+        try:
+            return super().delete_message(chat_id, message_id)
+        except:
+            pass
+
 
 def send_message_telegram(message, chat_id, subject=''):
     """ Sending messages to the user through requests"""
@@ -741,14 +748,14 @@ def send_message_telegram(message, chat_id, subject=''):
 
 
 if __name__ == '__main__':
-    # b = BudgetBot()
-    header = {'accept': 'application/json', 'Content-Type': 'application/json', }
-    response = requests.post(
-        'https://budgetbot.site/monobank_api/v1/gAAAAABdvYjzLHsjflizmVujBOBrw5Ld804qsbF00Tl6uFtzjmQUPWWZ1b6LXo70ecMj9XAkyWhjMbqu26r2Lgu2jCCDhSdhICwGDodSMmaSsuuuNL2axtmg7WewXAFaqW52Ogj_PW1g',
-        data=json.dumps({'type': 'webhook_test'}), headers=header)
-    response = json.loads(response.content, encoding='utf-8')
-    if isinstance(response, dict) and response.get('webhook_test'):
-        print('OK')
+    b = BudgetBot()
+    # header = {'accept': 'application/json', 'Content-Type': 'application/json', }
+    # response = requests.post(
+    #     'https://budgetbot.site/monobank_api/v1/gAAAAABdvYjzLHsjflizmVujBOBrw5Ld804qsbF00Tl6uFtzjmQUPWWZ1b6LXo70ecMj9XAkyWhjMbqu26r2Lgu2jCCDhSdhICwGDodSMmaSsuuuNL2axtmg7WewXAFaqW52Ogj_PW1g',
+    #     data=json.dumps({'type': 'webhook_test'}), headers=header)
+    # response = json.loads(response.content, encoding='utf-8')
+    # if isinstance(response, dict) and response.get('webhook_test'):
+    #     print('OK')
     # b.add_from_api()
     #
     # b.add_from_api('')

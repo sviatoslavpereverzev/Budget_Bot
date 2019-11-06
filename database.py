@@ -751,28 +751,56 @@ class DB:
                                            f"AND is_income = true AND user_id = {user_id}",
                    'monthly_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
                                        f"extract(month from date_create) = extract(month from current_date) "
+                                       f"AND extract(year from date_create) = extract(year from current_date)"
                                        f"AND is_income = false AND user_id = {user_id}",
                    'monthly_income': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
                                      f"extract(month from date_create) = extract(month from current_date) "
+                                     f"AND extract(year from date_create) = extract(year from current_date)"
                                      f"AND is_income = true AND user_id = {user_id}",
                    'previous_monthly_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
                                                 f"extract(month from date_create) = extract(month from current_date) -1"
+                                                f" AND extract(year from date_create) = extract(year from current_date)"
                                                 f"AND is_income = false AND user_id = {user_id}",
                    'previous_monthly_income': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
-                                              f"extract(month from date_create) = extract(month from current_date) -1"
+                                              f"extract(month from date_create) = extract(month from current_date) -1 "
+                                              f"AND extract(year from date_create) = extract(year from current_date)"
                                               f"AND is_income = true AND user_id = {user_id}",
                    'week_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
                                     f"extract(week from date_create) = extract(week from current_date) "
+                                    f"AND extract(year from date_create) = extract(year from current_date)"
                                     f"AND is_income = false AND user_id = {user_id}",
                    'week_income': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
                                   f"extract(month from date_create) = extract(month from current_date) "
+                                  f"AND extract(year from date_create) = extract(year from current_date)"
                                   f"AND is_income = true AND user_id = {user_id}",
                    'previous_week_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
-                                             f"extract(week from date_create) = extract(week from current_date) -1"
+                                             f"extract(week from date_create) = extract(week from current_date) -1 "
+                                             f"AND extract(year from date_create) = extract(year from current_date)"
                                              f"AND is_income = false AND user_id = {user_id}",
                    'previous_week_income': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
-                                           f"extract(month from date_create) = extract(month from current_date) -1"
-                                           f"AND is_income = true AND user_id = {user_id}"
+                                           f"extract(month from date_create) = extract(month from current_date) -1 "
+                                           f"AND extract(year from date_create) = extract(year from current_date)"
+                                           f"AND is_income = true AND user_id = {user_id}",
+                   'day_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                                   f"extract(day from date_create) = extract(day from current_date) "
+                                   f"AND extract(year from date_create) = extract(year from current_date)"
+                                   f"AND extract(month from date_create) = extract(month from current_date)"
+                                   f"AND is_income = false AND user_id = {user_id}",
+                   'day_income': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                                 f"extract(day from date_create) = extract(day from current_date) "
+                                 f"AND extract(year from date_create) = extract(year from current_date)"
+                                 f"AND extract(month from date_create) = extract(month from current_date)"
+                                 f"AND is_income = true AND user_id = {user_id}",
+                   'previous_day_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                                            f"extract(day from date_create) = extract(day from current_date) -1 "
+                                            f"AND extract(year from date_create) = extract(year from current_date)"
+                                            f"AND extract(month from date_create) = extract(month from current_date)"
+                                            f"AND is_income = false AND user_id = {user_id}",
+                   'previous_day_income': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                                          f"extract(day from date_create) = extract(day from current_date) -1 "
+                                          f"AND extract(year from date_create) = extract(year from current_date)"
+                                          f"AND extract(month from date_create) = extract(month from current_date)"
+                                          f"AND is_income = true AND user_id = {user_id}"
                    }
 
         for key in queries:

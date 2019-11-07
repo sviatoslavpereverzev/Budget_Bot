@@ -41,6 +41,35 @@ logfile = dir_path + '/logs/main.log'
 logger = logging.getLogger()
 formatter = logging.Formatter(u'%(filename) s[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]: \n%(message)s')
 
+ONLY_PRIVATE_METHODS = ['start', 'settings', 'get_command_token', ]
+ONLY_SUPERUSER_METHODS = ['ping', 'text', ]
+
+
+def access_check(func):
+    def wrapper(*args, **kwargs):
+        if args and isinstance(args[0], telebot.types.Message):
+            message = args[0]
+
+            if message.from_user.is_bot:
+                return
+            if not bot.db.can_work_in_group() and message.chat.id != message.from_user.id:
+                bot.send_message(chat_id=message.chat.id,
+                                 text=f'Работа в группе отключена. Зайдите в настройки бота и откройте доступ.')
+                return
+
+            command = message.text.replace('/', '')
+            if command in ONLY_PRIVATE_METHODS and message.chat.id != message.from_user.id:
+                bot.send_message(chat_id=message.chat.id,
+                                 text='Эту команду можно использовать только в приватных сообщениях.')
+                return
+
+            if command in ONLY_SUPERUSER_METHODS and message.from_user.id not in bot.superusers:
+                return
+
+        return func(*args, **kwargs)
+
+    return wrapper
+
 
 @app.route('/')
 def hello_world():
@@ -141,27 +170,32 @@ def webhook():
         flask.abort(403)
 
 
+@access_check
 @bot.message_handler(commands=['ping'])
-def send_welcome(message):
+def ping(message):
     logging.error('ping OK')
     bot.reply_to(message, 'Привет 👋\n Я работаю 😎')
 
 
+@access_check
 @bot.message_handler(commands=['add'])
 def add(message):
     bot.add(message)
 
 
+@access_check
 @bot.message_handler(commands=['settings'])
 def settings(message):
     bot.settings(message)
 
 
+@access_check
 @bot.message_handler(commands=['report'])
 def report(message):
     bot.report(message)
 
 
+@access_check
 @bot.message_handler(commands=['start'])
 def start(message):
     bot.start(message)
@@ -172,6 +206,7 @@ def help_(message):
     bot.help(message)
 
 
+@access_check
 @bot.message_handler(commands=['command_token'])
 def get_command_token(message):
     bot.get_command_token(message)
@@ -182,6 +217,7 @@ def callback_inline(call):
     bot.callback_inline(call)
 
 
+@access_check
 @bot.message_handler(content_types=['text'])
 def text(message):
     bot.text(message)

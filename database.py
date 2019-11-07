@@ -811,6 +811,10 @@ class DB:
                 db.execute(query)
                 return db.fetchone()[0]
 
+    @staticmethod
+    def can_work_in_group():
+        return True
+
 
 if __name__ == '__main__':
     db_ = DB()

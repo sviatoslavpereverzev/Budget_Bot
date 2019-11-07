@@ -18,7 +18,6 @@ from encryption import encrypt
 
 # дописать help_data
 # добавить версию приложения
-# исправить Name Error в подкатегориях для транзакций, которые добавляются с моно
 
 class BudgetBot(telebot.TeleBot):
     def __init__(self):
@@ -55,6 +54,9 @@ class BudgetBot(telebot.TeleBot):
         # Version of api client monobank
         self.monobank_api_version = None
 
+        # Superusers ids
+        self.superusers = None
+
         self.set_settings()
 
     def set_settings(self):
@@ -70,6 +72,9 @@ class BudgetBot(telebot.TeleBot):
 
         self.host = self.config.get('FLASK', 'webhook_host')
         self.monobank_api_version = self.config.get('BUDGET_BOT', 'monobank_api_version')
+
+        self.superusers = [int(user_id) for user_id in
+                           self.config.get('BUDGET_BOT', 'superusers').split(',')]
 
     def start(self, message):
         """Adding a user to the database and welcome with user"""

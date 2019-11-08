@@ -131,29 +131,29 @@ class DB:
         with DB() as db:
             db.execute(query)
 
-    @staticmethod
-    def _create_table_cards():
-        query = """
-                CREATE TABLE budget_bot_cards (
-                id SERIAL PRIMARY KEY,
-                merchant_id TEXT UNIQUE,
-                user_id INTEGER REFERENCES budget_bot_users (user_id) ON DELETE RESTRICT,
-                chat_id INTEGER,
-                token TEXT, 
-                bank TEXT,
-                date_create TIMESTAMP,
-                date_update TIMESTAMP,
-                card_number TEXT,
-                card_status SMALLINT,
-                balance BIGINT,
-                credit_limit BIGINT,
-                currency_code SMALLINT,
-                card_name TEXT,
-                date_request TIMESTAMP,
-                user_name TEXT);"""
-
-        with DB() as db:
-            db.execute(query)
+    # @staticmethod
+    # def _create_table_cards():
+    #     query = """
+    #             CREATE TABLE budget_bot_cards (
+    #             id SERIAL PRIMARY KEY,
+    #             merchant_id TEXT UNIQUE,
+    #             user_id INTEGER REFERENCES budget_bot_users (user_id) ON DELETE RESTRICT,
+    #             chat_id INTEGER,
+    #             token TEXT,
+    #             bank TEXT,
+    #             date_create TIMESTAMP,
+    #             date_update TIMESTAMP,
+    #             card_number TEXT,
+    #             card_status SMALLINT,
+    #             balance BIGINT,
+    #             credit_limit BIGINT,
+    #             currency_code SMALLINT,
+    #             card_name TEXT,
+    #             date_request TIMESTAMP,
+    #             user_name TEXT);"""
+    #
+    #     with DB() as db:
+    #         db.execute(query)
 
     @staticmethod
     def is_user(user_id):
@@ -840,6 +840,7 @@ if __name__ == '__main__':
     # db._create_table_users()
     # from time import sleep
     #
+    print(db_.get_data(529088251))
     # while True:
     #     data = db_.get_new_transaction()
     #     if data:

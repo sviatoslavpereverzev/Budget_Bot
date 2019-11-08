@@ -52,7 +52,7 @@ def access_check(func):
 
             if message.from_user.is_bot:
                 return
-            if not bot.db.can_work_in_group() and message.chat.id != message.from_user.id:
+            if not bot.db.can_work_in_group( message.from_user.id) and message.chat.id != message.from_user.id:
                 bot.send_message(chat_id=message.chat.id,
                                  text=f'Работа в группе отключена. Зайдите в настройки бота и откройте доступ.')
                 return

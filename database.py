@@ -6,7 +6,7 @@ import logging
 from configparser import ConfigParser
 from datetime import datetime, timedelta
 
-from sqlalchemy import create_engine, distinct
+from sqlalchemy import create_engine, distinct, extract, func
 from sqlalchemy.orm import sessionmaker
 
 from models.users import Users
@@ -115,7 +115,7 @@ class DB:
         try:
             self.session.commit()
         except Exception as e:
-            message = f'Error add data in db.\nUser id: {message.from_user.id}.\nError: {e}'
+            logging.error(f'Error add data in db.\nUser id: {message.from_user.id}.\nError: {e}')
             return False
 
         return balance
@@ -127,8 +127,8 @@ class DB:
         return True
 
     def get_balance(self, user_id):
-        user = self.session.query(Users).filter(Users.user_id == user_id).first()
-        return user.balance
+        balance = self.session.query(Users.balance).filter(Users.user_id == user_id).scalar()
+        return balance
 
     def update_balance(self, user_id, amount, is_income):
         user = self.session.query(Users).filter(Users.user_id == user_id).first()
@@ -183,8 +183,9 @@ class DB:
 
     def set_category(self, transaction_id, category):
         transaction = self.session.query(Data).filter(Data.transaction_id == transaction_id).first()
-        transaction.category = category
-        self.session.commit()
+        if transaction:
+            transaction.category = category
+            self.session.commit()
 
     def set_subcategory(self, transaction_id, subcategory):
         transaction = self.session.query(Data).filter(Data.transaction_id == transaction_id).first()
@@ -220,8 +221,8 @@ class DB:
             return False
 
     def get_category(self, user_id):
-        user = self.session.query(Users).filter(Users.user_id == user_id).first()
-        return user.category if user else None
+        category = self.session.query(Users.category).filter(Users.user_id == int(user_id)).first()
+        return category[0] if category else {}
 
     def update_category(self, user_id, category):
         user = self.session.query(Users).filter(Users.user_id == user_id).first()
@@ -234,75 +235,60 @@ class DB:
         return len(category) < self.max_number_categories
 
     def can_add_subcategory(self, call):
-        category = self.get_category(call.message.chat.id)
+        category = self.get_category(call.from_user.id)
         callback_data = json.loads(call.data)
         category = category.get(callback_data.get('cat'), {})
         subcategory = category.get('subcategories', {})
         return len(subcategory) < self.max_number_subcategories
 
-    @staticmethod
-    def get_data_report(time_from, time_to, user_id, is_income, type_data=''):
+    def get_data_report(self, time_from, time_to, user_id, is_income, type_data=''):
         text = ''
-        query_end = f" FROM budget_bot_data WHERE date_create BETWEEN '{time_from}' AND '{time_to}'" \
-                    f" AND user_id= {user_id} AND is_income = {is_income} AND status= 1 "
+        filters = (Data.user_id == user_id,
+                   Data.date_create >= time_from,
+                   Data.date_create <= time_to,
+                   Data.is_income == is_income,
+                   Data.status == 1)
 
-        with DB() as db:
-            query = f"SELECT DISTINCT category, subcategory {query_end};"
-            db.execute(query)
-            data = db.fetchall()
+        #  we take the amount of transactions for the period
+        amount = self.session.query(func.sum(Data.amount)).filter(*filters).scalar()
+        if not amount:
+            return
+        text += f'Всего{type_data}: {amount / 100}грн \n\n'
 
-            if not len(data):
-                return False
+        # transactions that have subcategories
+        categories = self.session.query(Data.category).filter(*filters, Data.subcategory != None) \
+            .distinct(Data.category).order_by(Data.category).all()
+        if categories:
+            for category in categories:
+                amount_category = self.session.query(func.sum(Data.amount)).filter(*filters,
+                                                                                   Data.category == category).scalar()
+                text += f'        {category[0].strip()} всего: {amount_category / 100} грн:\n'
 
-            query = "SELECT SUM (amount)" + query_end + ";"
-            db.execute(query)
-            amount = db.fetchone()[0]
-            if amount:
-                amount = int(amount) / 100
-            text += f'Всего{type_data}: {amount}грн \n\n'
+                subcategories = self.session.query(Data.subcategory).filter(*filters, Data.category == category,
+                                                                            Data.subcategory != None) \
+                    .distinct(Data.subcategory).order_by(Data.subcategory).all()
 
-            dict_data = {'without_subcategory': [], 'with_subcategory': {}}
-            for category, subcategory in data:
-                if subcategory == 'None' or subcategory is None:
-                    dict_data['without_subcategory'].append(category)
-                else:
-                    if category in dict_data['with_subcategory']:
-                        dict_data['with_subcategory'][category].append(subcategory)
-                    else:
-                        dict_data['with_subcategory'][category] = [subcategory]
-
-            for category, subcategories in dict_data['with_subcategory'].items():
-
-                query = "SELECT SUM (amount)" + query_end + f"AND category = '{category}'" + ";"
-                db.execute(query)
-                amount_category = db.fetchone()[0]
-                if amount_category:
-                    amount_category = int(amount_category) / 100
-                text += f'        {category.strip()} всего: {amount_category} грн:\n'
                 for subcategory in subcategories:
-                    query = "SELECT SUM (amount)" + query_end + \
-                            f"AND category = '{category}' AND subcategory = '{subcategory}'" + ";"
-                    db.execute(query)
-                    amount_subcategory = db.fetchone()[0]
-                    if amount_subcategory:
-                        amount_subcategory = int(amount_subcategory) / 100
-                    text += f'                {subcategory} - {amount_subcategory} грн\n'
+                    amount_subcategory = self.session.query(func.sum(Data.amount)).filter(*filters,
+                                                                                          Data.category == category,
+                                                                                          Data.subcategory == subcategory).scalar()
+                    text += f'                {subcategory[0]} - {amount_subcategory / 100} грн\n'
                 text += '\n'
 
-            for category in dict_data['without_subcategory']:
-                query = "SELECT SUM (amount)" + query_end + f"AND category = '{category}'" + ";"
-                db.execute(query)
-                amount_category = db.fetchone()[0]
-                if amount_category:
-                    amount_category = int(amount_category) / 100
-                text += f'        {category.strip()}: {amount_category} грн\n'
+        # transactions that have no subcategories
+        categories = self.session.query(Data.category).filter(*filters, Data.subcategory == None) \
+            .distinct(Data.category).order_by(Data.category).all()
+        for category in categories:
+            amount_category = self.session.query(func.sum(Data.amount)).filter(*filters,
+                                                                               Data.category == category).scalar()
+            text += f'        {category[0].strip()}: {amount_category / 100} грн\n'
         return text
 
     def generate_report(self, time_from, time_to, user_id):
         """Gathering report message"""
 
-        costs = self.get_data_report(time_from, time_to, user_id, 'false', ' расходов')
-        income = self.get_data_report(time_from, time_to, user_id, 'true', ' доходов')
+        costs = self.get_data_report(time_from, time_to, user_id, False, ' расходов')
+        income = self.get_data_report(time_from, time_to, user_id, True, ' доходов')
 
         if costs or income:
             message = ''
@@ -323,54 +309,50 @@ class DB:
                 and the value is its name
 
         """
+        date_from = datetime.now() - timedelta(days=365)
+        transactions = self.session.query(Data).filter(Data.user_id == user_id,
+                                                       Data.status == 1,
+                                                       Data.date_create > date_from, ) \
+            .distinct(extract('year', Data.date_create), extract('month', Data.date_create)).all()
 
-        with DB() as db:
-            date_from = datetime.now() - timedelta(days=365)
-            query = "SELECT DISTINCT EXTRACT(MONTH FROM date_create), EXTRACT(YEAR FROM date_create) " \
-                    "FROM budget_bot_data  WHERE date_create > '%s' AND user_id= %s AND status= 1" \
-                    "ORDER BY EXTRACT(MONTH FROM date_create), " \
-                    "EXTRACT(YEAR FROM date_create);" % \
-                    (date_from.strftime('%Y-%m-%d %H:%M:%S'), user_id)
-            db.execute(query)
-            answer = db.fetchall()
-            calendar_dict = {}
-            for month, year in answer:
-                year = int(year)
-                month = int(month)
-                if year in calendar_dict:
-                    calendar_dict[year].append(month)
-                else:
-                    calendar_dict[year] = [month]
+        calendar_dict = {}
+        for transaction in transactions:
+            year = transaction.date_create.year
+            month = transaction.date_create.month
+            if year in calendar_dict:
+                calendar_dict[year].append(month)
+            else:
+                calendar_dict[year] = [month]
 
-            dict_return = {}
+        dict_return = {}
 
-            for year, months in sorted(calendar_dict.items()):
-                if len(calendar_dict) < 2:
-                    for month in months:
-                        dict_return.update(
-                            {f'{str(month)}_{str(year)[-1]}': self.calendar_month.get(month, 'Month_error')})
-                else:
-                    for month in months:
-                        dict_return.update(
-                            {f'{str(month)}_{str(year)[-1]}': self.calendar_month.get(month,
-                                                                                      'Month_error') + f' {year}'})
+        for year, months in sorted(calendar_dict.items()):
+            if len(calendar_dict) < 2:
+                for month in months:
+                    dict_return.update(
+                        {f'{str(month)}_{str(year)[-1]}': Data.CALENDER_MONTH.get(month, 'Month_error')})
+            else:
+                for month in months:
+                    dict_return.update(
+                        {f'{str(month)}_{str(year)[-1]}': Data.CALENDER_MONTH.get(month,
+                                                                                  'Month_error') + f' {year}'})
 
         return dict_return
 
-    def delete_category(self, message, id_category):
-        category = self.get_category(message.chat.id)
+    def delete_category(self, user_id, id_category):
+        category = self.get_category(user_id)
         try:
             category.pop(str(id_category))
-            self.update_category(message.chat.id, category)
+            self.update_category(user_id, category)
             return True
         except KeyError:
             return False
 
-    def delete_subcategory(self, message, id_category, id_subcategory):
-        category = self.get_category(message.from_user.id)
+    def delete_subcategory(self, user_id, id_category, id_subcategory):
+        category = self.get_category(user_id)
         try:
             category[str(id_category)]['subcategories'].pop(str(id_subcategory))
-            self.update_category(message.from_user.id, category)
+            self.update_category(user_id, category)
             return True
         except KeyError:
             return False
@@ -469,9 +451,9 @@ class DB:
                     Data.status == 1).distinct(Users.user_id).all()
         return [transaction.user_id for transaction, user in transactions] if transactions else []
 
-    @staticmethod
-    def simple_commands(user_id, command):
-        queries = {'balance': f"SELECT balance/100 FROM budget_bot_users WHERE user_id = {user_id};",
+    def simple_commands(self, user_id, command):
+
+        queries = {'balance': int(self.get_balance(user_id)),
                    'earnings_per_hour': f"SELECT div(SUM(amount/100), 720) FROM budget_bot_data WHERE status = 1 and "
                                         f"date_create > current_date - 30 AND is_income = true AND user_id = {user_id}",
                    'cost_per_hour': f"SELECT div(SUM(amount/100), 720) FROM budget_bot_data WHERE status = 1 and "
@@ -496,59 +478,53 @@ class DB:
                                      f"extract(month from date_create) = extract(month from current_date) "
                                      f"AND extract(year from date_create) = extract(year from current_date)"
                                      f"AND is_income = true AND user_id = {user_id}",
-                   'previous_monthly_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
-                                                f"extract(month from date_create) = extract(month from current_date) -1"
-                                                f" AND extract(year from date_create) = extract(year from current_date)"
-                                                f"AND is_income = false AND user_id = {user_id}",
-                   'previous_monthly_income': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
-                                              f"extract(month from date_create) = extract(month from current_date) -1 "
-                                              f"AND extract(year from date_create) = extract(year from current_date)"
-                                              f"AND is_income = true AND user_id = {user_id}",
-                   'week_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
-                                    f"extract(week from date_create) = extract(week from current_date) "
-                                    f"AND extract(year from date_create) = extract(year from current_date)"
-                                    f"AND is_income = false AND user_id = {user_id}",
-                   'week_income': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
-                                  f"extract(month from date_create) = extract(month from current_date) "
-                                  f"AND extract(year from date_create) = extract(year from current_date)"
-                                  f"AND is_income = true AND user_id = {user_id}",
-                   'previous_week_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
-                                             f"extract(week from date_create) = extract(week from current_date) -1 "
-                                             f"AND extract(year from date_create) = extract(year from current_date)"
-                                             f"AND is_income = false AND user_id = {user_id}",
-                   'previous_week_income': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
-                                           f"extract(month from date_create) = extract(month from current_date) -1 "
-                                           f"AND extract(year from date_create) = extract(year from current_date)"
-                                           f"AND is_income = true AND user_id = {user_id}",
-                   'day_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
-                                   f"extract(day from date_create) = extract(day from current_date) "
-                                   f"AND extract(year from date_create) = extract(year from current_date)"
-                                   f"AND extract(month from date_create) = extract(month from current_date)"
-                                   f"AND is_income = false AND user_id = {user_id}",
-                   'day_income': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
-                                 f"extract(day from date_create) = extract(day from current_date) "
-                                 f"AND extract(year from date_create) = extract(year from current_date)"
-                                 f"AND extract(month from date_create) = extract(month from current_date)"
-                                 f"AND is_income = true AND user_id = {user_id}",
-                   'previous_day_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
-                                            f"extract(day from date_create) = extract(day from current_date) -1 "
-                                            f"AND extract(year from date_create) = extract(year from current_date)"
-                                            f"AND extract(month from date_create) = extract(month from current_date)"
-                                            f"AND is_income = false AND user_id = {user_id}",
-                   'previous_day_income': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
-                                          f"extract(day from date_create) = extract(day from current_date) -1 "
-                                          f"AND extract(year from date_create) = extract(year from current_date)"
-                                          f"AND extract(month from date_create) = extract(month from current_date)"
-                                          f"AND is_income = true AND user_id = {user_id}"
+                   # 'previous_monthly_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                   #                              f"extract(month from date_create) = extract(month from current_date) -1"
+                   #                              f" AND extract(year from date_create) = extract(year from current_date)"
+                   #                              f"AND is_income = false AND user_id = {user_id}",
+                   # 'previous_monthly_income': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                   #                            f"extract(month from date_create) = extract(month from current_date) -1 "
+                   #                            f"AND extract(year from date_create) = extract(year from current_date)"
+                   #                            f"AND is_income = true AND user_id = {user_id}",
+                   # 'week_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                   #                  f"extract(week from date_create) = extract(week from current_date) "
+                   #                  f"AND extract(year from date_create) = extract(year from current_date)"
+                   #                  f"AND is_income = false AND user_id = {user_id}",
+                   # 'week_income': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                   #                f"extract(month from date_create) = extract(month from current_date) "
+                   #                f"AND extract(year from date_create) = extract(year from current_date)"
+                   #                f"AND is_income = true AND user_id = {user_id}",
+                   # 'previous_week_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                   #                           f"extract(week from date_create) = extract(week from current_date) -1 "
+                   #                           f"AND extract(year from date_create) = extract(year from current_date)"
+                   #                           f"AND is_income = false AND user_id = {user_id}",
+                   # 'previous_week_income': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                   #                         f"extract(month from date_create) = extract(month from current_date) -1 "
+                   #                         f"AND extract(year from date_create) = extract(year from current_date)"
+                   #                         f"AND is_income = true AND user_id = {user_id}",
+                   # 'day_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                   #                 f"extract(day from date_create) = extract(day from current_date) "
+                   #                 f"AND extract(year from date_create) = extract(year from current_date)"
+                   #                 f"AND extract(month from date_create) = extract(month from current_date)"
+                   #                 f"AND is_income = false AND user_id = {user_id}",
+                   # 'day_income': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                   #               f"extract(day from date_create) = extract(day from current_date) "
+                   #               f"AND extract(year from date_create) = extract(year from current_date)"
+                   #               f"AND extract(month from date_create) = extract(month from current_date)"
+                   #               f"AND is_income = true AND user_id = {user_id}",
+                   # 'previous_day_expenses': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                   #                          f"extract(day from date_create) = extract(day from current_date) -1 "
+                   #                          f"AND extract(year from date_create) = extract(year from current_date)"
+                   #                          f"AND extract(month from date_create) = extract(month from current_date)"
+                   #                          f"AND is_income = false AND user_id = {user_id}",
+                   # 'previous_day_income': f"SELECT SUM (amount/100) FROM budget_bot_data WHERE status = 1 and "
+                   #                        f"extract(day from date_create) = extract(day from current_date) -1 "
+                   #                        f"AND extract(year from date_create) = extract(year from current_date)"
+                   #                        f"AND extract(month from date_create) = extract(month from current_date)"
+                   #                        f"AND is_income = true AND user_id = {user_id}"
                    }
 
-        for key in queries:
-            print(key)
-        query = queries.get(command)
-        if query:
-            with DB() as db:
-                db.execute(query)
-                return db.fetchone()[0]
+        return queries.get(command)
 
     def can_work_in_group(self, user_id):
         user = self.session.query(Users).filter(Users.user_id == user_id).first()
@@ -578,3 +554,7 @@ if __name__ == '__main__':
     # print(db.change_sheet_id())
     # print(db.add_data_in_sheet())
     # print(db.can_work_in_group(529088251))
+    # print(db.get_report_month(529088251))
+    # time_from = datetime.now() - timedelta(days=60)
+    # print(db.generate_report(time_from, datetime.now(), 529088251))
+    # print(db.simple_commands(529088251, 'balance'))

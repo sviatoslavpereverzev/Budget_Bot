@@ -58,6 +58,11 @@ class Users(Base):
 
 
 class Data(Base):
+    CALENDER_MONTH = {
+        1: 'Январь', 2: 'Февраль', 3: 'Март', 4: 'Апрель', 5: 'Май', 6: 'Июнь', 7: 'Июль', 8: 'Августу',
+        9: 'Сентабрь',
+        10: 'Октябрь', 11: 'Ноябрь', 12: 'Декабрь'
+    }
     __tablename__ = 'budget_bot_data'
 
     id = Column(Integer, primary_key=True)

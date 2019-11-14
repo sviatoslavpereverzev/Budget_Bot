@@ -11,9 +11,14 @@ from configparser import ConfigParser
 import telebot
 from telebot import types
 
+from models.users import Data
+
 from database import DB
 from monobank_api import set_webhook, get_webhook
 from encryption import encrypt
+
+
+# from databese_new import DB as DB_new
 
 
 # дописать help_data
@@ -172,7 +177,7 @@ class BudgetBot(telebot.TeleBot):
         callback_data = json.loads(call.data)
         categories = self.db.get_category(call.from_user.id)
         subcategories_dict = categories.get(callback_data.get('ct', ), {}).get('subcategories', {})
-        if callback_data.get('ct') == '99':
+        if callback_data.get('ct') == 99:
             self.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
             return
 
@@ -226,7 +231,7 @@ class BudgetBot(telebot.TeleBot):
 
         if call:
             callback_data = json.loads(call.data)
-            if callback_data.get('ct', ) == '99':
+            if callback_data.get('ct', ) == 99:
                 self.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
                 return
             categories = self.db.get_category(call.from_user.id)
@@ -262,7 +267,7 @@ class BudgetBot(telebot.TeleBot):
                     self.db.set_subcategory(transaction_id, subcategory_name)
                 balance = self.db.get_balance(call.from_user.id)
                 self.db.set_balance_transaction(transaction_id, balance)
-                message_text = f'Добавил:\n{message_text}\nБаланс: {balance/100} грн.'
+                message_text = f'Добавил:\n{message_text}\nБаланс: {balance / 100} грн.'
                 self.send_message(chat_id=call.message.chat.id, text=message_text)
 
     def set_settings_bot(self, call):
@@ -397,7 +402,7 @@ class BudgetBot(telebot.TeleBot):
             time_to = (datetime.combine(datetime.today(), time.min) + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
             report_ = self.db.generate_report(time_from, time_to, call.from_user.id)
             if report_:
-                message_text = f'{"-"*38}\nОтчет за день: \n\n{report_}'
+                message_text = f'{"-" * 38}\nОтчет за день: \n\n{report_}'
 
         # week
         elif report_for == 2:
@@ -408,21 +413,21 @@ class BudgetBot(telebot.TeleBot):
                 '%Y-%m-%d 00:00:00')
             report_ = self.db.generate_report(time_from, time_to, call.from_user.id)
             if report_:
-                message_text = f'{"-"*38}\nОтчет за неделю: \n\n{report_}'
+                message_text = f'{"-" * 38}\nОтчет за неделю: \n\n{report_}'
 
         # month
         elif report_for == 3 or exact_month:
             if exact_month:
                 month = int(exact_month.split('_')[0])
                 year = int(str(datetime.now().year)[:-1] + exact_month.split('_')[1])
-            month_name = self.db.calendar_month.get(month, 'месяц')
+            month_name = Data.CALENDER_MONTH.get(month, 'месяц')
             time_from = [day for day in c.itermonthdates(year, month) if day.month == month][0].strftime(
                 '%Y-%m-%d 00:00:00')
             time_to = [day for day in c.itermonthdates(year, month) if day.month == month + 1][0].strftime(
                 '%Y-%m-%d 00:00:00')
             report_ = self.db.generate_report(time_from, time_to, call.from_user.id)
             if report_:
-                message_text = f'{"-"*38}\nОтчет за {month_name}: \n\n{report_}'
+                message_text = f'{"-" * 38}\nОтчет за {month_name}: \n\n{report_}'
 
         if message_text:
             self.send_message(chat_id=call.message.chat.id,
@@ -452,18 +457,22 @@ class BudgetBot(telebot.TeleBot):
         elif report_for == 5:
             balance = self.db.get_balance(call.from_user.id)
             self.send_message(chat_id=call.message.chat.id,
-                              text=f'Баланс: {balance/100} грн.')
+                              text=f'Баланс: {balance / 100} грн.')
 
-        elif report_for != '99':
+        elif report_for != 99:
             self.prepare_report(call, report_for)
 
     def delete_category(self, call):
         self.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
         callback_data = json.loads(call.data)
+        if callback_data.get('ct') == 99:
+            self.send_message(chat_id=call.message.chat.id, text='Нельзя удалить категорию.')
+            return
         categories = self.db.get_category(call.from_user.id)
         category_name = categories.get(callback_data.get('ct', {})).get('name', 'Name Error')
+
         if callback_data.get('an'):
-            if self.db.delete_category(call.message, callback_data.get('ct')):
+            if self.db.delete_category(call.from_user.id, callback_data.get('ct')):
                 self.send_message(chat_id=call.message.chat.id, text=f'Удалил категорию: {category_name}')
             else:
                 self.send_message(chat_id=call.message.chat.id, text='Что-то пошло не так (')
@@ -483,9 +492,11 @@ class BudgetBot(telebot.TeleBot):
                             subcategories_dict.items()}
             self.keyboard(call.message.chat.id, 'Выбери подкатегорию:', buttons_name, callback_key='sub',
                           previous_data=json.dumps(data), add_cancel=False)
+
         elif callback_data.get('an'):
             subcategory_name = subcategories_dict.get(callback_data.get('sub', ), {}).get('name', 'Name Error')
-            if self.db.delete_subcategory(call, callback_data.get('ct'), callback_data.get('sub')):
+
+            if self.db.delete_subcategory(call.from_user.id, callback_data.get('ct'), callback_data.get('sub')):
                 self.send_message(chat_id=call.message.chat.id, text=f'Удалил подкатегорию: {subcategory_name}')
             else:
                 self.send_message(chat_id=call.message.chat.id, text='Что-то пошло не так (')
@@ -504,13 +515,17 @@ class BudgetBot(telebot.TeleBot):
 
         buttons_name = {1: 'Да', 0: 'Нет'}
         self.keyboard(call.message.chat.id, t.get(callback_data.get('a'), 'Вы уверенны?'), buttons_name,
-                      callback_key='an', previous_data=call.data)
+                      callback_key='an', previous_data=call.data, add_cancel=False)
+
 
     def add_subcategory(self, call):
         callback_data = json.loads(call.data)
+        self.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+        if callback_data.get('ct') == 99:
+            self.send_message(chat_id=call.message.chat.id, text='Нельзя добавить подкатегорию.')
+            return
         categories = self.db.get_category(call.from_user.id)
         category_name = categories.get(callback_data.get('ct'), {}).get('name')
-        self.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
         if self.db.can_add_subcategory(call):
             self.send_message(chat_id=call.message.chat.id, text=f'Категория: {category_name}. '
                                                                  f'Введите новое имя подкатегории:',
@@ -567,7 +582,7 @@ class BudgetBot(telebot.TeleBot):
                                 if description:
                                     message_text += f'\nОписание: {description}.'
                                 if balance:
-                                    message_text += f'\nБаланс: {balance/100} грн.'
+                                    message_text += f'\nБаланс: {balance / 100} грн.'
                                 self.send_message(chat_id=message.chat.id,
                                                   text=message_text)
                             else:
@@ -718,7 +733,7 @@ class BudgetBot(telebot.TeleBot):
 
         callback = json.loads(previous_data, encoding='utf-8')
         if add_cancel:
-            buttons.update({'99': 'Отмена'})
+            buttons.update({99: 'Отмена'})
         list_keys = []
         keyboard = types.InlineKeyboardMarkup(row_width=qt_key)
         for button_id, button_name in buttons.items():

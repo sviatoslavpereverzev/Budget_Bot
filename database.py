@@ -391,8 +391,8 @@ class DB:
             return False
 
     def get_google_sheets_id(self, user_id):
-        user = self.session.query(Users).filter(Users.user_id == user_id).first()
-        return user.sheet_id
+        sheet_id = self.session.query(Users.sheet_id).filter(Users.user_id == user_id).first()
+        return sheet_id[0]
 
     def set_google_sheets_id(self, user_id, sheet_id):
         if sheet_id.rfind('https://docs.google.com') != -1:

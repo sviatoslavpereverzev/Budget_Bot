@@ -531,34 +531,34 @@ class DB:
                 return connect.execute(query).scalar()
 
     def can_work_in_group(self, user_id):
-        user = self.session.query(Users).filter(Users.user_id == user_id).first()
-        return user.groups_allowed if user else False
+        groups_allowed = self.session.query(Users.groups_allowed).filter(Users.user_id == user_id).first()
+        return groups_allowed[0] if groups_allowed else False
 
 
 if __name__ == '__main__':
     db = DB()
-    # print(db.is_user(529088251))
+    print(db.is_user(529088251))
     # print(db.add_user(''))
-    # print(db.get_amount_transaction('154'))
+    print(db.get_amount_transaction('154'))
     # db.set_subcategory('154', 'Test')
     # db.set_transaction_status('154', 1)
     # db.set_balance(529088251, 100500)
-    # print(db.get_balance(529088251))
+    print(db.get_balance(529088251))
     # db.update_balance(529088251, 1000, False)
     # db.set_balance_transaction('154', 100)
-    # print(db.get_category(529088251))
+    print(db.get_category(529088251))
 
     # print(sorted(db.get_data(529088251)))
     # db.set_data_added(529088251, [167, 163, 172, 154], 'test')
     # db.update_category(529088251, {})
-    # print(db.can_add_category(529088251))
+    print(db.can_add_category(529088251))
     # print(db.set_google_sheet_id_change(529088251, 'test'))
     # print(db.reset_google_sheet_id_change(529088251, ))
-    # print(db.create_sheets_for())
-    # print(db.change_sheet_id())
-    # print(db.add_data_in_sheet())
-    # print(db.can_work_in_group(529088251))
+    print(db.create_sheets_for())
+    print(db.change_sheet_id())
+    print(db.add_data_in_sheet())
+    print(db.can_work_in_group(529088251))
     # print(db.get_report_month(529088251))
     # time_from = datetime.now() - timedelta(days=60)
     # print(db.generate_report(time_from, datetime.now(), 529088251))
-    # print(db.simple_commands(529088251, 'balance'))
+    print(db.simple_commands(529088251, 'balance'))

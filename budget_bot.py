@@ -259,7 +259,6 @@ class BudgetBot(telebot.TeleBot):
                     message_text += '\nКатегория: %s' % category_name
                 message_text += subcategory_text
                 transaction_id = callback_data.get('id')
-                self.db.set_transaction_status(transaction_id, 1)
                 amount = self.db.get_amount_transaction(transaction_id)
                 self.db.update_balance(call.from_user.id, abs(amount), amount > 0)
                 self.db.set_category(transaction_id, category_name)
@@ -267,6 +266,7 @@ class BudgetBot(telebot.TeleBot):
                     self.db.set_subcategory(transaction_id, subcategory_name)
                 balance = self.db.get_balance(call.from_user.id)
                 self.db.set_balance_transaction(transaction_id, balance)
+                self.db.set_transaction_status(transaction_id, 1)
                 message_text = f'Добавил:\n{message_text}\nБаланс: {balance / 100} грн.'
                 self.send_message(chat_id=call.message.chat.id, text=message_text)
 

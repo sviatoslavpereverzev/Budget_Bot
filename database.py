@@ -194,7 +194,7 @@ class DB:
 
     def get_data(self, user_id):
         transactions = self.session.query(Data).filter(Data.user_id == user_id,
-                                                       Data.is_add_in_sheet == False,
+                                                       Data.is_add_in_sheet != True,
                                                        Data.status == 1).order_by(Data.date_create).all()
         data = []
         if transactions:
@@ -444,12 +444,12 @@ class DB:
         return [user.user_id for user in users] if users else []
 
     def add_data_in_sheet(self):
-        transactions = self.session.query(Data, Users) \
+        users = self.session.query(Data.user_id) \
             .join(Users, Users.user_id == Data.user_id) \
-            .filter(Data.is_add_in_sheet == False,
+            .filter(Data.is_add_in_sheet != True,
                     Users.sheet_id != None,
                     Data.status == 1).distinct(Users.user_id).all()
-        return [transaction.user_id for transaction, user in transactions] if transactions else []
+        return [user[0] for user in users]
 
     def simple_commands(self, user_id, command):
 
@@ -537,28 +537,28 @@ class DB:
 
 if __name__ == '__main__':
     db = DB()
-    print(db.is_user(529088251))
+    # print(db.is_user(529088251))
     # print(db.add_user(''))
-    print(db.get_amount_transaction('154'))
+    # print(db.get_amount_transaction('154'))
     # db.set_subcategory('154', 'Test')
     # db.set_transaction_status('154', 1)
     # db.set_balance(529088251, 100500)
-    print(db.get_balance(529088251))
+    # print(db.get_balance(529088251))
     # db.update_balance(529088251, 1000, False)
     # db.set_balance_transaction('154', 100)
-    print(db.get_category(529088251))
+    # print(db.get_category(529088251))
 
     # print(sorted(db.get_data(529088251)))
     # db.set_data_added(529088251, [167, 163, 172, 154], 'test')
     # db.update_category(529088251, {})
-    print(db.can_add_category(529088251))
+    # print(db.can_add_category(529088251))
     # print(db.set_google_sheet_id_change(529088251, 'test'))
     # print(db.reset_google_sheet_id_change(529088251, ))
-    print(db.create_sheets_for())
-    print(db.change_sheet_id())
-    print(db.add_data_in_sheet())
-    print(db.can_work_in_group(529088251))
+    # print(db.create_sheets_for())
+    # print(db.change_sheet_id())
+    # print(db.add_data_in_sheet())
+    # print(db.can_work_in_group(529088251))
     # print(db.get_report_month(529088251))
     # time_from = datetime.now() - timedelta(days=60)
     # print(db.generate_report(time_from, datetime.now(), 529088251))
-    print(db.simple_commands(529088251, 'balance'))
+    # print(db.simple_commands(529088251, 'balance'))

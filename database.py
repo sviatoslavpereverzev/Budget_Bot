@@ -169,6 +169,7 @@ class DB:
             return api_data['transaction_id']
 
         except Exception as e:
+            self.session.rollback()
             logging.error(f'Error add data from api in db.\nUser id: {api_data["user_id"]}.\nError: {e}')
 
     def set_transaction_status(self, transaction_id, status):

@@ -108,7 +108,8 @@ class DB:
                     status=1,
                     type='bot',
                     balance=balance,
-                    description=description)
+                    description=description,
+                    is_add_in_sheet=False)
 
         self.session.add(data)
 
@@ -161,7 +162,8 @@ class DB:
                     card_balance=api_data['card_balance'],
                     type=api_data['type'],
                     status=api_data['status'],
-                    is_income=api_data['is_income'], )
+                    is_income=api_data['is_income'],
+                    is_add_in_sheet=False,)
         self.session.add(data)
 
         try:

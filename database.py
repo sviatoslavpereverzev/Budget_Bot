@@ -450,8 +450,8 @@ class DB:
     def add_data_in_sheet(self):
         users = self.session.query(Data.user_id) \
             .join(Users, Users.user_id == Data.user_id) \
-            .filter(Data.is_add_in_sheet != True,
-                    Users.sheet_id != None,
+            .filter(Data.is_add_in_sheet is not True,
+                    Users.sheet_id is not None,
                     Data.status == 1).distinct(Users.user_id).all()
         return [user[0] for user in users]
 

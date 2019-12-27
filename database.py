@@ -288,6 +288,9 @@ class DB:
     def generate_report(self, time_from, time_to, user_id):
         """Gathering report message"""
 
+        time_from = time_from.strftime('%Y-%m-%d %H:%M:%S')
+        time_to = time_to.strftime('%Y-%m-%d %H:%M:%S')
+
         costs = self.get_data_report(time_from, time_to, user_id, False, ' расходов')
         income = self.get_data_report(time_from, time_to, user_id, True, ' доходов')
 

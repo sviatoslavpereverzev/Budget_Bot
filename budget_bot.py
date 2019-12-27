@@ -398,19 +398,16 @@ class BudgetBot(telebot.TeleBot):
 
         # day
         if report_for == 1:
-            time_from = datetime.combine(datetime.today(), time.min).strftime('%Y-%m-%d %H:%M:%S')
-            time_to = (datetime.combine(datetime.today(), time.min) + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
+            time_from = datetime.combine(datetime.today(), time.min)
+            time_to = datetime.combine(datetime.today(), time.min) + timedelta(days=1)
             report_ = self.db.generate_report(time_from, time_to, call.from_user.id)
             if report_:
                 message_text = f'{"-" * 38}\nОтчет за день: \n\n{report_}'
 
         # week
         elif report_for == 2:
-            time_from = list(week for week in c.monthdatescalendar(year, month) if datetime.now().date() in week)[0][
-                0].strftime('%Y-%m-%d 00:00:00')
-            time_to = list(week for week in c.monthdatescalendar(year, month) if datetime.now().date() in week)[0][
-                -1].strftime(
-                '%Y-%m-%d 00:00:00')
+            time_from = list(week for week in c.monthdatescalendar(year, month) if datetime.now().date() in week)[0][0]
+            time_to = list(week for week in c.monthdatescalendar(year, month) if datetime.now().date() in week)[0][-1]
             report_ = self.db.generate_report(time_from, time_to, call.from_user.id)
             if report_:
                 message_text = f'{"-" * 38}\nОтчет за неделю: \n\n{report_}'
@@ -421,10 +418,8 @@ class BudgetBot(telebot.TeleBot):
                 month = int(exact_month.split('_')[0])
                 year = int(str(datetime.now().year)[:-1] + exact_month.split('_')[1])
             month_name = Data.CALENDER_MONTH.get(month, 'месяц')
-            time_from = [day for day in c.itermonthdates(year, month) if day.month == month][0].strftime(
-                '%Y-%m-%d 00:00:00')
-            time_to = [day for day in c.itermonthdates(year, month) if day.month == month + 1][0].strftime(
-                '%Y-%m-%d 00:00:00')
+            time_from = [day for day in c.itermonthdates(year, month) if day.month == month][0]
+            time_to = time_from + timedelta(days=calendar.monthrange(year, month)[1])
             report_ = self.db.generate_report(time_from, time_to, call.from_user.id)
             if report_:
                 message_text = f'{"-" * 38}\nОтчет за {month_name}: \n\n{report_}'
@@ -516,7 +511,6 @@ class BudgetBot(telebot.TeleBot):
         buttons_name = {1: 'Да', 0: 'Нет'}
         self.keyboard(call.message.chat.id, t.get(callback_data.get('a'), 'Вы уверенны?'), buttons_name,
                       callback_key='an', previous_data=call.data, add_cancel=False)
-
 
     def add_subcategory(self, call):
         callback_data = json.loads(call.data)

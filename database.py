@@ -92,7 +92,7 @@ class DB:
             if values.get('name') == category.strip():
                 is_income = values.get('is_income')
 
-        if is_income is not None:
+        if is_income is not None and date > datetime.now() - timedelta(days=30):
             self.update_balance(message.from_user.id, amount, is_income)
 
         balance = self.get_balance(message.from_user.id)

@@ -567,7 +567,7 @@ class BudgetBot(telebot.TeleBot):
                         if amount < 9223372036854775807:
 
                             date = ''
-                            patterns = [r'\d{2}.\d{2}.\d{2}\s\d{2}:\d{2}', r'\d{2}.\d{2}.\d{2}']
+                            patterns = [r'\d{2}[.]\d{2}[.]\d{2}\s\d{2}[:]\d{2}', r'\d{2}[.]\d{2}[.]\d{2}']
                             for pattern in patterns:
                                 if re.findall(pattern, message.text):
                                     date = re.findall(pattern, message.text)[0]
@@ -579,11 +579,11 @@ class BudgetBot(telebot.TeleBot):
                                 if len(date) == 8:
                                     date += ' 12:00'
                                 try:
-                                    date = datetime.strptime(date, '%m.%d.%y %H:%M')
+                                    date = datetime.strptime(date, '%d.%m.%y %H:%M')
                                 except ValueError:
                                     self.send_message(chat_id=message.chat.id,
                                                       text='Неправильная дата.\n'
-                                                           'Формат даты %m.%d.%y %H:%M или %m.%d.%y')
+                                                           'Формат даты %d.%m.%y %H:%M или %d.%m.%y')
                                     return
 
                             if description and len(description) > self.max_len_description:
@@ -599,7 +599,7 @@ class BudgetBot(telebot.TeleBot):
                                 if balance:
                                     message_text += f'\nБаланс: {balance / 100} грн.'
                                 if date:
-                                    message_text += f'\nДата: {date.strftime("%m.%d.%y %H:%M.")}'
+                                    message_text += f'\nДата: {date.strftime("%d.%m.%y %H:%M.")}'
                                 self.send_message(chat_id=message.chat.id,
                                                   text=message_text)
                             else:

@@ -596,7 +596,7 @@ class BudgetBot(telebot.TeleBot):
                                 message_text = f'Добавил:\n{message.reply_to_message.text} {message_amount} грн.'
                                 if description:
                                     message_text += f'\nОписание: {description}.'
-                                if balance:
+                                if balance and not date:
                                     message_text += f'\nБаланс: {balance / 100} грн.'
                                 if date:
                                     message_text += f'\nДата: {date.strftime("%d.%m.%y %H:%M.")}'

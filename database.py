@@ -73,13 +73,16 @@ class DB:
             logging.error(f'Error add user in db.\nUser id: {message.from_user.id}\n Error: {e}')
             return False
 
-    def add_data(self, message, description=None):
+    def add_data(self, message, description=None, date=None):
         text = message.reply_to_message.text
         category = text.split('.')[0].split(':')[1].strip()
         if text.split('.')[1].rfind('Подкатегория') != -1:
             subcategory = text.split('.')[1].split(':')[1].strip()
         else:
             subcategory = None
+
+        if not date:
+            date = datetime.now()
 
         amount = re.findall(r'\d+[.]\d+|\d+', message.text)[0]
         amount = round(float(amount), 2) * 100
@@ -98,7 +101,7 @@ class DB:
                     user_id=message.from_user.id,
                     chat_id=message.chat.id,
                     transaction_id=message.message_id,
-                    date_create=datetime.now(),
+                    date_create=date,
                     date_update=datetime.now(),
                     category=category,
                     subcategory=subcategory,

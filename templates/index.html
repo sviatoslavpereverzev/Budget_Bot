@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %} BudgetBot {% endblock %}
+<style>
+    .main {
+        min-height: 100%;
+        min-width: 100%;
+    }
+</style>
+
+{% block content %}
+<!-----Stuffing----->
+<div class="main overflow-hidden text-center row h-50">
+    <div class="main-text col-sm-2 col-md-8 col-lg-5 mx-auto mt-5">
+        <h1 class="display-4 font-weight-normal">Управляй своими деньгами</h1><br>
+        <p class="lead font-weight-normal">BudgetBot - телеграм бот предназначенный, для того чтоб помочь
+            Вам управлять своим бюджетом. Все доходы и расходы будут записываться в Вашу персональную Google
+            Таблицу, в которой будут все необходимые графики и таблицы для введения бюджета.
+            Также Вы можете строить любые графики, таблицы или делать расчеты благодаря данным
+            которые будут в неё автоматически добавляться.</p>
+        <a class="btn btn-outline-primary" href="https://t.me/Budget_sheets_bot">Перейти к использованию</a>
+    </div>
+</div>
+{% endblock %}

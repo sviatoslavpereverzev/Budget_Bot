@@ -8,6 +8,7 @@ import flask
 import telebot
 from configparser import ConfigParser
 from flask import jsonify
+from flask import render_template
 
 from encryption import decrypt
 from budget_bot import BudgetBot, send_message_telegram
@@ -72,13 +73,18 @@ def access_check(func):
 
 
 @app.route('/')
-def hello_world():
-    return 'Budget App'
+def index():
+    return render_template('index.html')
 
 
-@app.route('/offer')
-def offer():
-    return 'УУУуупппссс, я еще это не дописал'
+@app.route("/agreement")
+def agreement():
+    return render_template('agreement.html')
+
+
+@app.route("/help")
+def help_():
+    return render_template('helping.html')
 
 
 @app.route('/notification', methods=['POST', 'GET'])

@@ -178,33 +178,33 @@ def webhook():
         flask.abort(403)
 
 
-@access_check
 @bot.message_handler(commands=['ping'])
+@access_check
 def ping(message):
     logging.error('ping OK')
     bot.reply_to(message, 'Привет 👋\n Я работаю 😎')
 
 
-@access_check
 @bot.message_handler(commands=['add'])
+@access_check
 def add(message):
     bot.add(message)
 
 
-@access_check
 @bot.message_handler(commands=['settings'])
+@access_check
 def settings(message):
     bot.settings(message)
 
 
-@access_check
 @bot.message_handler(commands=['report'])
+@access_check
 def report(message):
     bot.report(message)
 
 
-@access_check
 @bot.message_handler(commands=['start'])
+@access_check
 def start(message):
     bot.start(message)
 
@@ -214,8 +214,8 @@ def help_(message):
     bot.help(message)
 
 
-@access_check
 @bot.message_handler(commands=['command_token'])
+@access_check
 def get_command_token(message):
     bot.get_command_token(message)
 
@@ -225,8 +225,8 @@ def callback_inline(call):
     bot.callback_inline(call)
 
 
-@access_check
 @bot.message_handler(content_types=['text'])
+@access_check
 def text(message):
     bot.text(message)
 

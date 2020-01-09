@@ -166,7 +166,7 @@ class DB:
                     type=api_data['type'],
                     status=api_data['status'],
                     is_income=api_data['is_income'],
-                    is_add_in_sheet=False,)
+                    is_add_in_sheet=False, )
         self.session.add(data)
 
         try:
@@ -336,15 +336,16 @@ class DB:
         dict_return = {}
 
         for year, months in sorted(calendar_dict.items()):
+            # are there transactions for two different years
             if len(calendar_dict) < 2:
                 for month in months:
                     dict_return.update(
-                        {f'{str(month)}_{str(year)[-1]}': Data.CALENDER_MONTH.get(month, 'Month_error')})
+                        {f'{str(month)}_{str(year)[-2:]}': Data.CALENDER_MONTH.get(month, 'Month_error')})
             else:
                 for month in months:
                     dict_return.update(
-                        {f'{str(month)}_{str(year)[-1]}': Data.CALENDER_MONTH.get(month,
-                                                                                  'Month_error') + f' {year}'})
+                        {f'{str(month)}_{str(year)[-2:]}': Data.CALENDER_MONTH.get(month,
+                                                                                  'Month_error') + f' {str(year)[-2:]}'})
 
         return dict_return
 

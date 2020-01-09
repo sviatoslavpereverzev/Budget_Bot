@@ -400,6 +400,7 @@ class BudgetBot(telebot.TeleBot):
             self.send_message(chat_id=call.message.chat.id, text=message_text, reply_markup=types.ForceReply())
 
     def prepare_report(self, call, report_for=None, exact_month=None):
+        print('prepare_report')
         """
         Generate a report for a specific period
 
@@ -435,7 +436,7 @@ class BudgetBot(telebot.TeleBot):
         elif report_for == 3 or exact_month:
             if exact_month:
                 month = int(exact_month.split('_')[0])
-                year = int(str(datetime.now().year)[:-1] + exact_month.split('_')[1])
+                year = int(str(datetime.now().year)[:-2] + exact_month.split('_')[1])
             month_name = Data.CALENDER_MONTH.get(month, 'месяц')
             time_from = [day for day in c.itermonthdates(year, month) if day.month == month][0]
             time_to = time_from + timedelta(days=calendar.monthrange(year, month)[1])

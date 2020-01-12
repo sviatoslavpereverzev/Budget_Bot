@@ -6,7 +6,7 @@ import json
 import pickle
 from configparser import ConfigParser
 
-import apiclient.discovery
+from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.errors import HttpError
@@ -49,24 +49,26 @@ class SheetsApi:
         """Starting Google Services"""
 
         creds = None
+        # The file token.pickle stores the user's access and refresh tokens, and is
+        # created automatically when the authorization flow completes for the first
+        # time.
         if os.path.exists(os.path.dirname(os.path.realpath(__file__)) + '/private/token.pickle'):
             with open(os.path.dirname(os.path.realpath(__file__)) + '/private/token.pickle', 'rb') as token:
                 creds = pickle.load(token)
-            # If there are no (valid) credentials available, let the user log in.
-
+        # If there are no (valid) credentials available, let the user log in.
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             else:
                 flow = InstalledAppFlow.from_client_secrets_file(
                     os.path.dirname(os.path.realpath(__file__)) + '/private/credentials.json', self.scope)
-                creds = flow.run_local_server()
+                creds = flow.run_local_server(port=0)
             # Save the credentials for the next run
             with open(os.path.dirname(os.path.realpath(__file__)) + '/private/token.pickle', 'wb') as token:
                 pickle.dump(creds, token)
 
-        self.drive_service = apiclient.discovery.build('drive', 'v3', credentials=creds)
-        self.sheet_service = apiclient.discovery.build('sheets', 'v4', credentials=creds)
+        self.drive_service = build('drive', 'v3', credentials=creds)
+        self.sheet_service = build('sheets', 'v4', credentials=creds)
 
     def create_sheet(self, db):
         """Creating a new table for the user and adding necessary sheets"""

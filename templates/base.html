@@ -6,8 +6,10 @@
           integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
     <link href="https://fonts.googleapis.com/css?family=Caveat|Pangolin" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css?family=Oswald" rel="stylesheet">
-    <link rel="shortcut icon" href="/static/image/logo.png" type="static/image/x-icon">
+    <link rel="shortcut icon"
+    href="{{ url_for('static', filename='image/icon.png') }}" type="static/image/x-icon">
     <title>{% block title %} {% endblock %}</title>
+
     <style>
 
         body, html {
@@ -17,15 +19,6 @@
 
         nav {
             min-height: 7%;
-        }
-
-        .dropdown {
-            position: inherit;
-        }
-
-        .content {
-            min-height: 88%;
-            background-color: #f8f9fa;
         }
 
         footer {
@@ -42,9 +35,29 @@
             text-decoration: underline;
         }
 
+        p, h1 {
+            font-weight: 400!important;
+            font-size: 1.25rem;
+        }
+
+        .dropdown {
+            position: inherit;
+        }
+
+        .content {
+            min-height: 88%;
+            background-color: #f8f9fa;
+        }
+
+        .attention {
+            color: #880404;
+        }
+
+
     </style>
 </head>
 <body>
+
 <!-----Navbar----->
 <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm">
     <a class="navbar-brand " href="https://t.me/Budget_sheets_bot">BudgetBot</a>
@@ -69,12 +82,30 @@
                     Помощь
                 </a>
                 <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarDropdownMenuLink">
-                    <a class="dropdown-item" href="/help">Для чего нужен BudgetBot</a>
-                    <a class="dropdown-item" href="/help">Что он может</a>
-                    <a class="dropdown-item" href="/help">Как переключиться на свою гугл таблицу</a>
-                    <a class="dropdown-item" href="/help">Как переключиться на свою гугл таблицу</a>
-                    <a class="dropdown-item" href="/help">Как добавить категорию</a>
-                    <a class="dropdown-item" href="/help">Для чего команда /report</a>
+                    <a class="dropdown-item" href="help#for what">Для чего нужен Budget Bot?</a>
+                    <a class="dropdown-item" href="help#what can">Что он может?</a>
+                    <a class="dropdown-item" href="help#for what google sheet">Для чего нужна гугл таблица?</a>
+                    <a class="dropdown-item" href="help#add">Для чего нужна команда /add?</a>
+                    <a class="dropdown-item" href="help#report">Для чего нужна команда /report?</a>
+                    <a class="dropdown-item" href="help#settings">Для чего нужна команда /settings?</a>
+                    <a class="dropdown-item" href="help#help">Для чего нужна команда /help?</a>
+                    <a class="dropdown-item" href="help#transaction">Что такое транзакция?</a>
+                    <a class="dropdown-item" href="help#amount">Как указать сумму транзакцию?</a>
+                    <a class="dropdown-item" href="help#add data">Как добавить транзакцию за другой день?</a>
+                    <a class="dropdown-item" href="help#sat desc">Как добавить описание транзакции?</a>
+                    <a class="dropdown-item" href="help#balance">Как считается баланс?</a>
+                    <a class="dropdown-item" href="help#set category">Как добавлять/удалять новую категорию/подкатегорию?</a>
+                    <a class="dropdown-item" href="help#income expenses">Что за тип категории “Доходы” и “Расходы”?</a>
+                    <a class="dropdown-item" href="help#notice">Для чего нужны оповещения от банков?</a>
+                    <a class="dropdown-item" href="help#take token mono">Получение токена Monobank для оповещений</a>
+                    <a class="dropdown-item" href="help#set notice mono">Как установить оповещения от Monobank?</a>
+                    <a class="dropdown-item" href="help#off notice mono">Как отключить оповещения от Monobank?</a>
+                    <a class="dropdown-item" href="help#check notice mono">Проверка оповещений от Monobank?</a>
+                    <a class="dropdown-item" href="help#notifications come">Что делать если не приходят уведомления от банка?</a>
+                    <a class="dropdown-item" href="help#table structure">Структура гугл таблицы созданной ботом?</a>
+                    <a class="dropdown-item" href="help#switch to table">Как переключиться на свою гугл таблицу?</a>
+                    <a class="dropdown-item" href="help#open access">Как открыть доступ на редактирование вашей Google таблицы?</a>
+                    <a class="dropdown-item" href="help#will be added">Что еще будет добавляться в бот?</a>
                 </div>
             </li>
         </ul>

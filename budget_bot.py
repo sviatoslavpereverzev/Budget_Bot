@@ -150,6 +150,14 @@ class BudgetBot(telebot.TeleBot):
         self.keyboard(message.chat.id, 'Выберите категорию:', buttons_name, callback_key='id', previous_data=data,
                       qt_key=1)
 
+    def send_for_all(self, message):
+        if message.from_user.id not in self.superusers:
+            return
+        if message.text.split('|')[1].strip() == 'all':
+            message_text = message.text.split('|')[-1].strip()
+            for chat in self.db.get_all_chats():
+                self.send_message(chat_id=chat, text=message_text)
+
     def get_command_token(self, message):
         token = encrypt(f'user_id:{message.from_user.id};chat_id:{message.chat.id}')
         self.send_message(chat_id=message.chat.id, text=f'Ваш токен:\n{token}')
@@ -188,7 +196,7 @@ class BudgetBot(telebot.TeleBot):
         if message_text:
             self.send_message(chat_id=call.message.chat.id, text=message_text)
 
-    def get_amount(self, call):
+    def set_category_subcategory(self, call):
         """Function to add income and expenses"""
 
         callback_data = json.loads(call.data)
@@ -219,12 +227,16 @@ class BudgetBot(telebot.TeleBot):
                 self.send_message(chat_id=call.message.chat.id, text=text_message,
                                   reply_markup=types.ForceReply())
 
-    def add_from_api(self, call=None, user_id=None, chat_id=None, id=None, message_text=None, data_api=None):
+    def add_data_from_api(self, call=None, user_id=None, chat_id=None, id=None, message_text=None, data_api=None):
         transaction_id = None
         if data_api:
             transaction_id = self.db.add_data_from_api(data_api)
-            if not transaction_id:
-                return False
+            if isinstance(transaction_id, Exception):
+                message_text = f'Error add data from api in db.\nUser id: {data_api["user_id"]}.\n' \
+                               f'Data: {data_api}.\nError: {transaction_id}'
+                logging.error(message_text)
+                send_message_telegram(message_text, self.chat_id_error_notification)
+                return
 
         if data_api and transaction_id:
             data = json.dumps({'f': 'afa', 'id': transaction_id})
@@ -398,7 +410,6 @@ class BudgetBot(telebot.TeleBot):
             self.send_message(chat_id=call.message.chat.id, text=message_text, reply_markup=types.ForceReply())
 
     def prepare_report(self, call, report_for=None, exact_month=None):
-        print('prepare_report')
         """
         Generate a report for a specific period
 
@@ -514,22 +525,6 @@ class BudgetBot(telebot.TeleBot):
             else:
                 self.send_message(chat_id=call.message.chat.id, text='Что-то пошло не так (')
 
-    def ask_again(self, call):
-        """Confirmation of the choice made"""
-
-        self.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
-        callback_data = json.loads(call.data)
-        categories = self.db.get_category(call.from_user.id)
-        category_name = categories.get(callback_data.get('ct', ), {}).get('name', 'Name Error')
-        subcategories_name = categories.get(callback_data.get('ct', ), {}).get('subcategories', {}).get(
-            callback_data.get('sub', ), {}).get('name', 'Name Error')
-        t = {1: f'Удалить категорию {category_name}?',
-             2: f'Удалить подкатегорию {subcategories_name}?'}
-
-        buttons_name = {1: 'Да', 0: 'Нет'}
-        self.keyboard(call.message.chat.id, t.get(callback_data.get('a'), 'Вы уверенны?'), buttons_name,
-                      callback_key='an', previous_data=call.data, add_cancel=False)
-
     def add_subcategory(self, call):
         callback_data = json.loads(call.data)
         self.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
@@ -549,7 +544,7 @@ class BudgetBot(telebot.TeleBot):
     def callback_inline(self, call):
         """Function selection depending on the button pressed"""
 
-        funcs = {'am': self.get_amount,
+        funcs = {'am': self.set_category_subcategory,
                  'set_stng': self.set_settings_bot,
                  'get_rp': self.get_report,
                  'del': self.delete_category,
@@ -557,7 +552,7 @@ class BudgetBot(telebot.TeleBot):
                  'a': self.ask_again,
                  'add_s': self.add_subcategory,
                  'help': self.help_data,
-                 'afa': self.add_from_api}
+                 'afa': self.add_data_from_api}
         try:
             if json.loads(call.data).get('af') and 'an' not in json.loads(call.data):
                 self.ask_again(call)
@@ -566,6 +561,22 @@ class BudgetBot(telebot.TeleBot):
                 func(call)
         except Exception as e:
             logging.error(e)
+
+    def ask_again(self, call):
+        """Confirmation of the choice made"""
+
+        self.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+        callback_data = json.loads(call.data)
+        categories = self.db.get_category(call.from_user.id)
+        category_name = categories.get(callback_data.get('ct', ), {}).get('name', 'Name Error')
+        subcategories_name = categories.get(callback_data.get('ct', ), {}).get('subcategories', {}).get(
+            callback_data.get('sub', ), {}).get('name', 'Name Error')
+        t = {1: f'Удалить категорию {category_name}?',
+             2: f'Удалить подкатегорию {subcategories_name}?'}
+
+        buttons_name = {1: 'Да', 0: 'Нет'}
+        self.keyboard(call.message.chat.id, t.get(callback_data.get('a'), 'Вы уверенны?'), buttons_name,
+                      callback_key='an', previous_data=call.data, add_cancel=False)
 
     def text(self, message):
         """Processing text messages from the user and calling certain functions"""
@@ -839,19 +850,3 @@ def send_message_telegram(message, chat_id, subject=''):
             logging.error(f'Error for send message to :{chat_id}. Error: {response.get("description")}')
     except Exception as e:
         logging.error(f'Send message Error.\n Error: {e}')
-
-
-if __name__ == '__main__':
-    b = BudgetBot()
-    # header = {'accept': 'application/json', 'Content-Type': 'application/json', }
-    # response = requests.post(
-    #     'https://budgetbot.site/monobank_api/v1/gAAAAABdvYjzLHsjflizmVujBOBrw5Ld804qsbF00Tl6uFtzjmQUPWWZ1b6LXo70ecMj9XAkyWhjMbqu26r2Lgu2jCCDhSdhICwGDodSMmaSsuuuNL2axtmg7WewXAFaqW52Ogj_PW1g',
-    #     data=json.dumps({'type': 'webhook_test'}), headers=header)
-    # response = json.loads(response.content, encoding='utf-8')
-    # if isinstance(response, dict) and response.get('webhook_test'):
-    #     print('OK')
-    # b.add_from_api()
-    #
-    # b.add_from_api('')
-    #
-    # b.process_new_updates()

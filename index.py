@@ -73,9 +73,17 @@ def start(message):
     bot.start(message)
 
 
-@bot.message_handler(commands=['help'])
-def help_(message):
-    bot.help(message)
+@bot.message_handler(commands=['ping'])
+@access_check
+def ping(message):
+    logging.error('ping OK')
+    bot.reply_to(message, 'Привет 👋\n Я работаю 😎')
+
+
+@bot.message_handler(commands=['send_for_all'])
+@access_check
+def send_for_all(message):
+    bot.send_for_all(message)
 
 
 @bot.message_handler(commands=['command_token'])

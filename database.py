@@ -73,6 +73,11 @@ class DB:
             logging.error(f'Error add user in db.\nUser id: {message.from_user.id}\n Error: {e}')
             return False
 
+    def get_all_chats(self):
+        return ['529088251']
+        chats = self.session.query(Users.chat_id).all()
+        return [chat[0] for chat in chats] if chats else []
+
     def add_data(self, message, description=None, date=None):
         text = message.reply_to_message.text
         category = text.split('.')[0].split(':')[1].strip()
@@ -345,7 +350,7 @@ class DB:
                 for month in months:
                     dict_return.update(
                         {f'{str(month)}_{str(year)[-2:]}': Data.CALENDER_MONTH.get(month,
-                                                                                  'Month_error') + f' {str(year)[-2:]}'})
+                                                                                   'Month_error') + f' {str(year)[-2:]}'})
 
         return dict_return
 

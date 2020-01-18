@@ -789,6 +789,40 @@ class BudgetBot(telebot.TeleBot):
         except:
             pass
 
+    def monobank_api_adapter(self, request_data, user_info):
+        data = get_dict_from_encrypt_data(user_info)
+        user_id = data.get('user_id')
+        chat_id = data.get('chat_id')
+        logging.error(f'User info: {data}')
+
+        # TODO разобраться с ошибкой если приходит когда транзакция приходит не в гривне
+        if user_id and chat_id and request_data['data']['statementItem']['currencyCode'] == 980:
+            data_mono = request_data['data']['statementItem']
+
+            data = {
+                'bank': 'Monobank',
+                'chat_id': chat_id,
+                'user_id': user_id,
+                'message_id': data_mono['time'],
+                'merchant_id': request_data['data']['account'],
+                'transaction_id': data_mono['id'],
+                'date_create': datetime.fromtimestamp(int(data_mono['time'])).strftime('%Y-%m-%d %H:%M:%S'),
+                'amount': abs(data_mono['amount']),
+                'commission': data_mono['commissionRate'],
+                'cashback': data_mono['cashbackAmount'],
+                'currency_code': data_mono['currencyCode'],
+                'description': data_mono['description'],
+                'card_balance': data_mono['balance'],
+                'type': 'monobank_api',
+                'status': 0,
+                'message_text': '',
+                'is_income': data_mono['amount'] >= 0
+            }
+
+            logging.error(f'Data api: {data}')
+
+            self.add_data_from_api(data_api=data)
+
 
 def send_message_telegram(message, chat_id, subject=''):
     """ Sending messages to the user through requests"""

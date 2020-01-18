@@ -38,16 +38,16 @@ def access_check(func):
                 return
             if not bot.db.can_work_in_group(message.from_user.id) and message.chat.id != message.from_user.id:
                 bot.send_message(chat_id=message.chat.id,
-                                 text=f'Работа в группе отключена. Зайдите в настройки бота и откройте доступ.')
+                                 text='Работа в группе отключена. Зайдите в настройки бота и откройте доступ.')
                 return
 
-            command = message.text.replace('/', '')
-            if command in ONLY_PRIVATE_METHODS and message.chat.id != message.from_user.id:
+            command = message.text.replace('/', '').split(' ')[0]
+            if command in PRIVATE_COMMANDS and message.chat.id != message.from_user.id:
                 bot.send_message(chat_id=message.chat.id,
                                  text='Эту команду можно использовать только в приватных сообщениях.')
                 return
 
-            if command in ONLY_SUPERUSER_METHODS and message.from_user.id not in bot.superusers:
+            if command in SUPERUSER_COMMANDS and message.from_user.id not in bot.superusers:
                 return
 
         return func(*args, **kwargs)
@@ -57,32 +57,26 @@ def access_check(func):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return flask.render_template('index.html')
 
 
 @app.route("/agreement")
 def agreement():
-    return render_template('agreement.html')
+    return flask.render_template('agreement.html')
 
 
 @app.route("/help")
 def help_():
-    return render_template('helping.html')
-
-
-@app.route('/notification', methods=['POST', 'GET'])
-def notification():
-    request_data = json.loads(flask.request.data)
-    chat_id = request_data.get('chat_id')
-    message_text = request_data.get('message_text')
-    if chat_id and message_text:
-        send_message_telegram(str(message_text), str(chat_id))
-    return 'OK'
+    return flask.render_template('helping.html')
 
 
 @app.route('/simple_commands/v1/<command>/<user_info>')
 def simple_commands(command, user_info):
     data = get_dict_from_encrypt_data(user_info)
+    if not data or not data.get('user_id'):
+        send_message_telegram(f'Error decrypt string: {user_info}', bot.chat_id_error_notification)
+        return 'Ошибка'
+
     user_id = data.get('user_id')
     answer = bot.simple_commands(command=command, user_id=user_id)
     return str(answer) if answer else 'Нет данных'
@@ -164,6 +158,12 @@ def add(message):
     bot.add(message)
 
 
+@bot.message_handler(commands=['report'])
+@access_check
+def report(message):
+    bot.report(message)
+
+
 @bot.message_handler(commands=['settings'])
 @access_check
 def settings(message):
@@ -175,47 +175,40 @@ def help_(message):
     bot.help(message)
 
 
-@bot.message_handler(commands=['command_token'])
-@access_check
-def get_command_token(message):
-    bot.get_command_token(message)
-
-
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
     bot.callback_inline(call)
 
 
 @bot.message_handler(content_types=['text'])
-@access_check
 def text(message):
     bot.text(message)
+
+
+@bot.message_handler(commands=['start'])
+@access_check
+def start(message):
+    bot.start(message)
+
+
+@bot.message_handler(commands=['ping'])
+@access_check
+def ping(message):
+    bot.ping(message)
+
+
+@bot.message_handler(commands=['send_for_all'])
+@access_check
+def send_for_all(message):
+    bot.send_for_all(message)
+
+
+@bot.message_handler(commands=['command_token'])
+@access_check
+def get_command_token(message):
+    bot.get_command_token(message)
 
 
 def main():
     logging.error('Run Budget Bot')
     bot.polling()
-
-
-def get_dict_from_encrypt_data(encrypt_data):
-    data = {}
-
-    try:
-        decrypt_data = decrypt(encrypt_data)
-        data = {k: v for k, v in (val.split(':') for val in decrypt_data.split(';'))}
-
-    except:
-        message_text = f'Error decrypt string: {encrypt_data}'
-        send_message_telegram(message_text, bot.chat_id_error_notification)
-
-    return data
-
-
-if __name__ == '__main__':
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    logging.basicConfig(level=logging.DEBUG,
-                        format=u'%(filename) s[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]: \n%(message)s',
-                        filename='%s/logs/budget.log' % dir_path, )
-    # Start flask server
-    app.run(host='0.0.0.0',
-            port=8080, )  # ssl_context=(WEBHOOK_SSL_CERT, WEBHOOK_SSL_PRIV), )

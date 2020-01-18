@@ -84,70 +84,42 @@ def simple_commands(command, user_info):
 
 @app.route('/monobank_api/v1/<user_info>', methods=['POST'])
 def mono_api(user_info):
-    if flask.request.data:
-        logging.error('Request: ', json.loads(flask.request.data))
-
-    data = get_dict_from_encrypt_data(user_info)
-
-    user_id = data.get('user_id')
-    chat_id = data.get('chat_id')
-
     if flask.request.headers.get('content-type') == 'application/json':
         if flask.request.data:
             request_data = json.loads(flask.request.data)
-            type_request = request_data.get('type')
-            if type_request == 'webhook_test':
-                return jsonify({'webhook_test': True})
-            elif type_request == 'StatementItem':
+            logging.error(f'Add data from monobank api.\n Data: {request_data}.')
 
-                # TODO разобраться с ошибкой если приходит когда транзакция приходит не в гривне
-                if user_id and chat_id and request_data['data']['statementItem']['currencyCode'] == 980:
-                    merchant_id = request_data['data']['account']
-                    data_mono = request_data['data']['statementItem']
+            if request_data.get('type') == 'webhook_test':
+                return flask.jsonify({'webhook_test': True})
 
-                    data = {
-                        'bank': 'Monobank',
-                        'chat_id': chat_id,
-                        'user_id': user_id,
-                        'message_id': data_mono['time'],
-                        'merchant_id': merchant_id,
-                        'transaction_id': data_mono['id'],
-                        'date_create': datetime.datetime.fromtimestamp(int(data_mono['time'])).strftime(
-                            '%Y-%m-%d %H:%M:%S'),
-                        'amount': abs(data_mono['amount']),
-                        'commission': data_mono['commissionRate'],
-                        'cashback': data_mono['cashbackAmount'],
-                        'currency_code': data_mono['currencyCode'],
-                        'description': data_mono['description'],
-                        'card_balance': data_mono['balance'],
-                        'type': 'monobank_api',
-                        'status': 0,
-                        'message_text': '',
-                        'is_income': data_mono['amount'] >= 0
+            elif request_data.get('type') == 'StatementItem':
+                bot.monobank_api_adapter(request_data, user_info)
 
-                    }
-                    if bot.add_from_api(data_api=data) is False:
-                        message_tex = 'Budget_bot Error,\nError: error add data from monobank api'
-                        if data.get('user_id'):
-                            message_tex += f'\nUser id: {user_id}'
-                        if flask.request.data:
-                            message_tex += f'\nData: {json.loads(flask.request.data)}'
-                        send_message_telegram(message_tex, bot.chat_id_error_notification)
-
-                return 'OK'
-
+        return 'OK'
     return flask.abort(403)
 
 
 @app.route(WEBHOOK_URL_PATH, methods=['POST'])
 def webhook():
     if flask.request.headers.get('content-type') == 'application/json':
-        json_string = flask.request.get_data().decode('utf-8')
-        update = telebot.types.Update.de_json(json_string)
-        logging.error('add new message')
-        bot.process_new_updates([update])
-        logging.error('Add: %s' % json_string)
-        return ''
+        json_string = None
+
+        try:
+            json_string = flask.request.get_data().decode('utf-8')
+            update = telebot.types.Update.de_json(json_string)
+            logging.error('add new message')
+            logging.error('\nAdd: %s\n' % json.loads(flask.request.get_data(), encoding='utf-8'))
+            bot.process_new_updates([update])
+
+        except Exception as e:
+            message_text = f'Error in add data from webhook. Error: {e}'
+            if json_string:
+                message_text += f'\n Json string: {json_string}'
+            logging.error(message_text)
+            send_message_telegram(message_text, bot.chat_id_error_notification)
+
+        finally:
+            return 'OK'
     else:
         flask.abort(403)
 

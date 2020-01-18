@@ -1,11 +1,17 @@
 # -*- coding: utf-8 -*-
+import os
 import logging
 import time
 
+from configparser import ConfigParser
+
 from budget_bot import BudgetBot
 from sheets_api import SheetsApi
+import telebot
 
-# написать файл README
+config = ConfigParser()
+dir_path = os.path.dirname(os.path.abspath(__file__))
+config.read(dir_path + '/config/app.ini')
 
 sheet_api = SheetsApi()
 bot = BudgetBot()

@@ -2,48 +2,31 @@
 import os
 import logging
 import time
-import datetime
 import json
+from configparser import ConfigParser
+
 import flask
 import telebot
-from configparser import ConfigParser
-from flask import jsonify
-from flask import render_template
 
-from encryption import decrypt
-from budget_bot import BudgetBot, send_message_telegram
+from budget_bot import BudgetBot
+from budget_bot import send_message_telegram
+from encryption import get_dict_from_encrypt_data
 
+# set settings
 config = ConfigParser()
 dir_path = os.path.dirname(os.path.abspath(__file__))
 config.read(dir_path + '/config/app.ini')
 
-API_TOKEN = config.get('BUDGET_BOT', 'token')
-WEBHOOK_HOST = config.get('FLASK', 'webhook_host')
-WEBHOOK_PORT = config.get('FLASK', 'webhook_port')
-WEBHOOK_LISTEN = config.get('FLASK', 'webhook_listen')
-WEBHOOK_SSL_CERT = dir_path + '/private/fullchain.pem'
-WEBHOOK_SSL_PRIV = dir_path + '/private/privkey.pem'
-WEBHOOK_URL_BASE = 'https://%s:%s' % (WEBHOOK_HOST, WEBHOOK_PORT)
-WEBHOOK_URL_PATH = '/%s/' % API_TOKEN
+PRIVATE_COMMANDS = [command.strip() for command in config.get('BUDGET_BOT', 'private_commands').split(',')]
+SUPERUSER_COMMANDS = [command.strip() for command in config.get('BUDGET_BOT', 'superuser_commands').split(',')]
+WEBHOOK_URL_BASE = 'https://%s:%s' % (config.get('FLASK', 'webhook_host'), config.get('FLASK', 'webhook_port'))
+WEBHOOK_URL_PATH = '/%s/' % config.get('BUDGET_BOT', 'token')
 
+app = flask.Flask(__name__, static_url_path='')
 bot = BudgetBot()
-app = flask.Flask(__name__)
-
-# Remove webhook, it fails sometimes the set if there is a previous webhook
-bot.remove_webhook()
+bot.remove_webhook()  # Remove webhook, it fails sometimes the set if there is a previous webhook
 time.sleep(1)
-
-# Set webhook
 bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH)
-
-# Настройки логирования
-os.makedirs(dir_path + '/logs/', exist_ok=True)
-logfile = dir_path + '/logs/main.log'
-logger = logging.getLogger()
-formatter = logging.Formatter(u'%(filename) s[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]: \n%(message)s')
-
-ONLY_PRIVATE_METHODS = ['start', 'settings', 'get_command_token', ]
-ONLY_SUPERUSER_METHODS = ['ping', 'text', ]
 
 
 def access_check(func):
@@ -101,11 +84,8 @@ def notification():
 def simple_commands(command, user_info):
     data = get_dict_from_encrypt_data(user_info)
     user_id = data.get('user_id')
-    if user_id:
-        answer = bot.simple_commands(command=command, user_id=user_id)
-        return str(answer) if answer else 'Нет данных'
-    else:
-        return 'Ошибка токена'
+    answer = bot.simple_commands(command=command, user_id=user_id)
+    return str(answer) if answer else 'Нет данных'
 
 
 @app.route('/monobank_api/v1/<user_info>', methods=['POST'])
@@ -178,13 +158,6 @@ def webhook():
         flask.abort(403)
 
 
-@bot.message_handler(commands=['ping'])
-@access_check
-def ping(message):
-    logging.error('ping OK')
-    bot.reply_to(message, 'Привет 👋\n Я работаю 😎')
-
-
 @bot.message_handler(commands=['add'])
 @access_check
 def add(message):
@@ -195,18 +168,6 @@ def add(message):
 @access_check
 def settings(message):
     bot.settings(message)
-
-
-@bot.message_handler(commands=['report'])
-@access_check
-def report(message):
-    bot.report(message)
-
-
-@bot.message_handler(commands=['start'])
-@access_check
-def start(message):
-    bot.start(message)
 
 
 @bot.message_handler(commands=['help'])

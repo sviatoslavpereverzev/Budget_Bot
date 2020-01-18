@@ -14,15 +14,9 @@ from telebot import types
 from models.users import Data
 
 from database import DB
+from encryption import encrypt, get_dict_from_encrypt_data
 from monobank_api import set_webhook, get_webhook
-from encryption import encrypt
 
-
-# from databese_new import DB as DB_new
-
-
-# дописать help_data
-# добавить версию приложения
 
 class BudgetBot(telebot.TeleBot):
     def __init__(self):
@@ -623,7 +617,7 @@ class BudgetBot(telebot.TeleBot):
                                 if balance and not date:
                                     message_text += f'\nБаланс: {balance / 100} грн.'
                                 if date:
-                                    message_text += f'\nДата: {date.strftime("%d.%m.%y %H:%M.")}'
+                                    message_text += f'\nДата: {date.strftime("%d.%m.%Y %H:%M.")}'
                                 self.send_message(chat_id=message.chat.id,
                                                   text=message_text)
                             else:

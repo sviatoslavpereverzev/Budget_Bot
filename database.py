@@ -558,7 +558,7 @@ if __name__ == '__main__':
     # db.set_balance_transaction('154', 100)
     # print(db.get_category(529088251))
 
-    print(sorted(db.get_data(529088251)))
+    # print(sorted(db.get_data(529088251)))
     # db.set_data_added(529088251, [167, 163, 172, 154], 'test')
     # db.update_category(529088251, {})
     # print(db.can_add_category(529088251))
@@ -566,7 +566,7 @@ if __name__ == '__main__':
     # print(db.reset_google_sheet_id_change(529088251, ))
     # print(db.create_sheets_for())
     # print(db.change_sheet_id())
-    print(db.add_data_in_sheet())
+    # print(db.add_data_in_sheet())
     # print(db.can_work_in_group(529088251))
     # print(db.get_report_month(529088251))
     # time_from = datetime.now() - timedelta(days=60)

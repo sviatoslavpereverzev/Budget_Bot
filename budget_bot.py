@@ -591,28 +591,30 @@ class BudgetBot(telebot.TeleBot):
                                       text='Уже есть')
                 else:
                     try:
-                        message_amount = re.findall(r'\d+[.]\d+|\d+', message.text)[0]
-                        amount = abs(int(round(float(message_amount), 2) * 100))
+                        re_expression = r'^\d+\.\d+$|^\d+\.\d+\s|\s\d+\.\d+\s|\s\d+\.\d+$|^\d+$|^\d+\s|\s\d+\s|\s\d+$'
+                        message_amount = re.findall(re_expression, message.text)
+                        if not message_amount:
+                            self.send_message(chat_id=message.chat.id, text='Сумма не найдена.')
+                            return
+
+                        amount = abs(int(round(float(message_amount[0]), 2) * 100))
                         if amount < 9223372036854775807:
+                            description = message.text.replace(str(message_amount[0]), '').strip()
 
-                            date = ''
-                            patterns = [r'\d{2}[.]\d{2}[.]\d{2}\s\d{2}[:]\d{2}', r'\d{2}[.]\d{2}[.]\d{2}']
-                            for pattern in patterns:
-                                if re.findall(pattern, message.text):
-                                    date = re.findall(pattern, message.text)[0]
-                                    break
-
-                            description = message.text.replace(date, '').replace(str(message_amount), '').strip()
+                            date = re.findall(r'\d{2,4}\.\d{2}\.\d{2,4}\s\d{2}\:\d{2}|\d{2,4}\.\d{2}\.\d{2,4}',
+                                              message.text)
 
                             if date:
-                                if len(date) == 8:
+                                date = date[0].strip()
+                                description = description.replace(date, '').strip()
+                                if len(date) == 10:
                                     date += ' 12:00'
                                 try:
-                                    date = datetime.strptime(date, '%d.%m.%y %H:%M')
+                                    date = datetime.strptime(date, '%d.%m.%Y %H:%M')
                                 except ValueError:
                                     self.send_message(chat_id=message.chat.id,
                                                       text='Неправильная дата.\n'
-                                                           'Формат даты %d.%m.%y %H:%M или %d.%m.%y')
+                                                           'Формат даты дд.мм.rrrr чч:мм или дд.мм.rrrr')
                                     return
 
                             if description and len(description) > self.max_len_description:
@@ -622,7 +624,7 @@ class BudgetBot(telebot.TeleBot):
 
                             balance = self.db.add_data(message, description, date=date)
                             if balance:
-                                message_text = f'Добавил:\n{message.reply_to_message.text} {message_amount} грн.'
+                                message_text = f'Добавил:\n{message.reply_to_message.text} {message_amount[0]} грн.'
                                 if description:
                                     message_text += f'\nОписание: {description}.'
                                 if balance and not date:

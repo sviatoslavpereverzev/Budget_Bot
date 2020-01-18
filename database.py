@@ -90,7 +90,7 @@ class DB:
             date = datetime.now()
 
         amount = re.findall(r'\d+[.]\d+|\d+', message.text)[0]
-        amount = round(float(amount), 2) * 100
+        amount = int(round(float(amount), 2) * 100)
 
         is_income = None
         for key, values in self.get_category(message.from_user.id).items():
@@ -180,7 +180,7 @@ class DB:
 
         except Exception as e:
             self.session.rollback()
-            logging.error(f'Error add data from api in db.\nUser id: {api_data["user_id"]}.\nError: {e}')
+            return e
 
     def set_transaction_status(self, transaction_id, status):
         transaction = self.session.query(Data).filter(Data.transaction_id == transaction_id).first()

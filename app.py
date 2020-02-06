@@ -114,7 +114,7 @@ def webhook():
         except Exception as e:
             message_text = f'Error in add data from webhook. Error: {e}'
             if json_string:
-                message_text += f'\n Json string: {json_string}'
+                message_text += f'\n Json string: {json.loads(flask.request.get_data())}'
             logging.error(message_text)
             send_message_telegram(message_text, bot.chat_id_error_notification)
 
@@ -122,6 +122,12 @@ def webhook():
             return 'OK'
     else:
         flask.abort(403)
+
+
+@bot.message_handler(commands=['start'])
+@access_check
+def start(message):
+    bot.start(message)
 
 
 @bot.message_handler(commands=['add'])
@@ -152,17 +158,6 @@ def callback_inline(call):
     bot.callback_inline(call)
 
 
-@bot.message_handler(content_types=['text'])
-def text(message):
-    bot.text(message)
-
-
-@bot.message_handler(commands=['start'])
-@access_check
-def start(message):
-    bot.start(message)
-
-
 @bot.message_handler(commands=['ping'])
 @access_check
 def ping(message):
@@ -179,6 +174,11 @@ def send_for_all(message):
 @access_check
 def get_command_token(message):
     bot.get_command_token(message)
+
+
+@bot.message_handler(content_types=['text'])
+def text(message):
+    bot.text(message)
 
 
 def main():

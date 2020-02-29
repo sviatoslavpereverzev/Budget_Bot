@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-from sqlalchemy import Column, Integer, BigInteger, String, JSON, DateTime, ForeignKey, SmallInteger, Boolean
+from sqlalchemy import Column, Integer, BigInteger, Date, Numeric, Boolean, String, DECIMAL, JSON, DateTime, ForeignKey, \
+    SmallInteger, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 

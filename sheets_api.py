@@ -297,6 +297,10 @@ class SheetsApi:
                         logging.error(f'Ошибка при изменении таблицы {spreadsheet_id}')
 
     def main(self):
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        logging.basicConfig(level=logging.DEBUG,
+                            format=u'%(filename) s[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]: \n%(message)s',
+                            filename='%s/logs/sheets_app.log' % dir_path, )
         logging.error('Start Sheet API')
         db = DB()
         self.set_service()

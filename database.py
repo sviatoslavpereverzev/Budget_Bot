@@ -32,6 +32,9 @@ class DB:
         # maximum number of subcategories
         self.max_number_subcategories = None
 
+        # chat id where bot error messages are sent
+        self.chat_id_error_notification = None
+
         self.set_settings()
 
     def set_settings(self):
@@ -40,6 +43,7 @@ class DB:
         self.db_url = config.get('DATABASE', 'url')
         self.max_number_categories = config.getint('BUDGET_BOT', 'max_number_categories')
         self.max_number_subcategories = config.getint('BUDGET_BOT', 'max_number_subcategories')
+        self.chat_id_error_notification = config.getint('BUDGET_BOT', 'chat_id_error_notification')
         self.connect_db()
 
     def connect_db(self):

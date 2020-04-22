@@ -298,16 +298,22 @@ class SheetsApi:
 
     def main(self):
         dir_path = os.path.dirname(os.path.realpath(__file__))
-        logging.basicConfig(level=logging.DEBUG,
+        logging.basicConfig(level=logging.ERROR,
                             format=u'%(filename) s[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]: \n%(message)s',
                             filename='%s/logs/sheets_app.log' % dir_path, )
         logging.error('Start Sheet API')
         db = DB()
         self.set_service()
+
+        time_refresh = time.time() + 3600
         while True:
             self.create_sheet(db)
             self.change_sheet_id(db)
             self.add_data(db)
+            if time_refresh < time.time():
+                self.set_service()
+                time_refresh = time.time() + 3600
+                logging.error('Refresh service')
             time.sleep(0.2)
 
 

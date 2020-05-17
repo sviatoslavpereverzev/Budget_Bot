@@ -857,5 +857,6 @@ def send_message_telegram(message, chat_id, subject=''):
         ).json()
         if not response['ok']:
             logging.error(f'Error for send message to :{chat_id}. Error: {response.get("description")}')
+            logging.error(f'Chat id: %s. Message: %s.')
     except Exception as e:
         logging.error(f'Send message Error.\n Error: {e}')

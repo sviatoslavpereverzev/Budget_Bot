@@ -52,10 +52,16 @@ class SheetsApi:
         # The file token.pickle stores the user's access and refresh tokens, and is
         # created automatically when the authorization flow completes for the first
         # time.
+
         if os.path.exists(os.path.dirname(os.path.realpath(__file__)) + '/private/token.pickle'):
             with open(os.path.dirname(os.path.realpath(__file__)) + '/private/token.pickle', 'rb') as token:
                 creds = pickle.load(token)
         # If there are no (valid) credentials available, let the user log in.
+
+        logging.error('Creds: %s' % creds)
+        if creds:
+            logging.error('Creds valid: %s' % creds.valid)
+
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
@@ -66,9 +72,8 @@ class SheetsApi:
             # Save the credentials for the next run
             with open(os.path.dirname(os.path.realpath(__file__)) + '/private/token.pickle', 'wb') as token:
                 pickle.dump(creds, token)
-
-        self.drive_service = build('drive', 'v3', credentials=creds)
-        self.sheet_service = build('sheets', 'v4', credentials=creds)
+        self.drive_service = build('drive', 'v3', credentials=creds, cache_discovery=True)
+        self.sheet_service = build('sheets', 'v4', credentials=creds, cache_discovery=True)
 
     def create_sheet(self, db):
         """Creating a new table for the user and adding necessary sheets"""

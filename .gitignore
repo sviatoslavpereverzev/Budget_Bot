@@ -1,0 +1,5 @@
+*.ini
+*.pickle
+encryption.py
+/private
+/logs

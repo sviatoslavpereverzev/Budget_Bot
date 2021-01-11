@@ -16,7 +16,6 @@ from models.users import Data
 from database import DB
 from encryption import encrypt, get_dict_from_encrypt_data
 from monobank_api import set_webhook, get_webhook
-from helpers.decorators import delete_message
 
 
 class BudgetBot(telebot.TeleBot):
@@ -101,48 +100,39 @@ class BudgetBot(telebot.TeleBot):
             message_text = f'И снова привет{user_name}👋\nЕсли Вам нужна помощь используй команду \help.'
             self.send_message(chat_id=message.chat.id, text=message_text)
 
-    @delete_message
     def add(self, message):
         """Select categories"""
+
+        self.delete_message(chat_id=message.chat.id, message_id=message.message_id)
         data = json.dumps({'f': 'am'})
         categories = self.db.get_category(message.from_user.id)
         buttons_name = {button_id: button_name.get('name', 'Name Error') for button_id, button_name in
                         categories.items()}
         self.keyboard(message.chat.id, 'Выбери категорию:', buttons_name, callback_key='ct', previous_data=data)
 
-    @delete_message
     def settings(self, message):
         """Select Settings categories"""
 
-        buttons_name = {
-            1: 'Добавить',
-            2: 'Удалить',
-            3: 'Получить ссылку на Google таблицу',
-            4: 'Изменить ссылку на Google таблицу',
-            5: 'Оповещения от Monobank',
-            6: 'Установить баланс'
-        }
-        self.keyboard(message.chat.id, 'Выбери настройки:', buttons_name, callback_key='ct',
-                      previous_data=json.dumps({'f': 'set_stng'}), qt_key=1, )
+        self.delete_message(chat_id=message.chat.id, message_id=message.message_id)
+        data = json.dumps({'f': 'set_stng'})
+        buttons_name = {1: 'Добавить', 2: 'Удалить', 3: 'Получить ссылку на Google таблицу',
+                        4: 'Изменить ссылку на Google таблицу', 5: 'Оповещения от Monobank', 6: 'Установить баланс'}
+        self.keyboard(message.chat.id, 'Выбери настройки:', buttons_name, callback_key='ct', previous_data=data,
+                      qt_key=1, )
 
-    @delete_message
     def report(self, message):
         """Select report categories"""
 
-        buttons_name = {
-            1: 'День',
-            2: 'Неделя',
-            3: 'Месяц',
-            4: 'Определенный месяц',
-            5: 'Получить баланс'
-        }
-        self.keyboard(message.chat.id, 'Отчет за:', buttons_name, callback_key='ct',
-                      previous_data=json.dumps({'f': 'get_rp'}), qt_key=1, )
+        self.delete_message(chat_id=message.chat.id, message_id=message.message_id)
+        data = json.dumps({'f': 'get_rp'})
+        buttons_name = {1: 'День', 2: 'Неделя', 3: 'Месяц', 4: 'Определенный месяц', 5: 'Получить баланс'}
+        self.keyboard(message.chat.id, 'Отчет за:', buttons_name, callback_key='ct', previous_data=data, qt_key=1, )
 
-    @delete_message
     def help(self, message):
         """Select categories for help the user"""
 
+        self.delete_message(chat_id=message.chat.id, message_id=message.message_id)
+        data = json.dumps({'f': 'help'})
         buttons_name = {
             1: 'Для чего нужен Budget Bot?',
             2: 'Что он может?',
@@ -157,8 +147,8 @@ class BudgetBot(telebot.TeleBot):
             11: {'name': 'Подробнее на сайте', 'url': 'https://budgetbot.site/'},
             12: {'name': 'Пользовательское соглашение', 'url': 'https://budgetbot.site/agreement'},
         }
-        self.keyboard(message.chat.id, 'Выберите категорию:', buttons_name, callback_key='id',
-                      previous_data=json.dumps({'f': 'help'}), qt_key=1)
+        self.keyboard(message.chat.id, 'Выберите категорию:', buttons_name, callback_key='id', previous_data=data,
+                      qt_key=1)
 
     def send_for_all(self, message):
         if message.from_user.id not in self.superusers:
@@ -179,10 +169,17 @@ class BudgetBot(telebot.TeleBot):
             answer = self.db.simple_commands(user_id, command)
             return answer
 
-    @delete_message
+    def add_card(self, message):
+        self.delete_message(chat_id=message.chat.id, message_id=message.message_id)
+        data = json.dumps({'f': 'addc'})
+        buttons_name = {1: 'Monobank', 2: 'PrivatBank'}
+        self.keyboard(message.chat.id, 'Отчет за:', buttons_name, callback_key='ct', previous_data=data, qt_key=1, )
+
     def help_data(self, call):
         """Sending help to the user"""
 
+        self.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+        callback_data = json.loads(call.data)
         all_messages = {
             1: 'Budget Bot - телегам бот предназначенный, для того чтоб помочь Вам управлять своим бюджетом.',
             2: 'Ваши транзакции записываются в Вашу Google таблицу в которой строятся различные таблицы и графики. Вы можете изменять таблицу как пожелаете или использовать стандартную Google таблицу, которая будет создана для Вас. При этом в Budget Bot есть команды, которые пришлют вам в телеграм стандартный отчет за месяц, день или неделю. Также Вы всегда можете посмотреть ваш общий баланс. Кроме этого Вы можете установить уведомления от банка, и при любой транзакции они будут автоматически приходить в Budget Bo',
@@ -194,9 +191,8 @@ class BudgetBot(telebot.TeleBot):
             8: 'Для переключение таблицы используйте команду “/settings” > “Изменить ссылку на Google таблицу” > открыть доступ на редактирование таблицы для пользователя и нажать “Да” > вставить Вашу ссылку на Google таблицу и отправить сообщение.',
             9: 'Используя команду “/settings” > “Оповещения от Monobank” > “Установить оповещения” > на ноутбуке перейдите по ссылке https://api.monobank.ua/ > сканируйте телефоном QR код и подтвердите в приложении Monobank > скопруйте Ваш токен > нажмите в боте “Установить” > Вставьте ваш токен и отправьте сообщение.',
             10: 'Telegram: @sviatoslav_pereverziev Почта: sviatoslav.pereverziev@gmail.com Телефон: +380 63 920 66 97', }
-
-        callback_data = json.loads(call.data)
-        message_text = all_messages.get(int(callback_data.get('id')))
+        messages_id = int(callback_data.get('id'))
+        message_text = all_messages.get(messages_id)
         if message_text:
             self.send_message(chat_id=call.message.chat.id, text=message_text)
 
@@ -207,11 +203,11 @@ class BudgetBot(telebot.TeleBot):
         categories = self.db.get_category(call.from_user.id)
         subcategories_dict = categories.get(callback_data.get('ct', ), {}).get('subcategories', {})
         if callback_data.get('ct') == 99:
-            delete_message(self, chat_id=call.message.chat.id, message_id=call.message.message_id)
+            self.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
             return
 
         if subcategories_dict and 'sub' not in callback_data:
-            delete_message(self, chat_id=call.message.chat.id, message_id=call.message.message_id)
+            self.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
             buttons_name = {button_id: button_name.get('name', 'Name Error') for button_id, button_name in
                             subcategories_dict.items()}
             self.keyboard(call.message.chat.id, 'Выберите подкатегорию:', buttons_name, callback_key='sub',
@@ -224,7 +220,7 @@ class BudgetBot(telebot.TeleBot):
             else:
                 subcategory_name = ''
             text_message = f'Категория: {category_name}.{subcategory_name} Сумма: '
-            delete_message(self, chat_id=call.message.chat.id, message_id=call.message.message_id)
+            self.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
             if category_name is None:
                 self.send_message(chat_id=call.message.chat.id, text='Что-то пошло не так (')
             else:
@@ -265,13 +261,12 @@ class BudgetBot(telebot.TeleBot):
         if call:
             callback_data = json.loads(call.data)
             if callback_data.get('ct', ) == 99:
-                delete_message(self, chat_id=call.message.chat.id, message_id=call.message.message_id)
+                self.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
                 return
-
             categories = self.db.get_category(call.from_user.id)
             subcategories_dict = categories.get(callback_data.get('ct', ), {}).get('subcategories', {})
             category_name = categories.get(callback_data.get('ct'), {}).get('name')
-            delete_message(self, chat_id=call.message.chat.id, message_id=call.message.message_id)
+            self.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
             if subcategories_dict and 'sub' not in callback_data:
                 message_text = call.message.text.replace('\nВыберете категорию:', '')
                 buttons_name = {button_id: button_name.get('name', 'Name Error') for button_id, button_name in
@@ -304,21 +299,19 @@ class BudgetBot(telebot.TeleBot):
                 message_text = f'Добавил:\n{message_text}\nБаланс: {balance / 100} грн.'
                 self.send_message(chat_id=call.message.chat.id, text=message_text)
 
-    @delete_message
     def set_settings_bot(self, call):
         """Setting user preferences"""
 
+        # self.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text='Дальше')
+        self.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
         callback_data = json.loads(call.data)
         func_id = callback_data.get('ct')
-
         if func_id == 1:
             buttons_name = {11: 'Категорию', 12: 'Подкатегорию', }
             self.keyboard(call.message.chat.id, 'Добавить:', buttons_name, callback_key='ct', previous_data=call.data, )
-
         elif func_id == 2:
             buttons_name = {21: 'Категорию', 22: 'Подкатегорию', }
             self.keyboard(call.message.chat.id, 'Удалить:', buttons_name, callback_key='ct', previous_data=call.data, )
-
         elif func_id == 3:
             sheets_id = self.db.get_google_sheets_id(call.from_user.id)
             if sheets_id is None:
@@ -342,14 +335,9 @@ class BudgetBot(telebot.TeleBot):
                                'и открыть доступ введите команду \help и перейдите в ' \
                                '"Как переключиться на свою гугл таблицу?".'
                 self.send_message(chat_id=call.message.chat.id, text=message_text)
-
         elif func_id == 5:
-            buttons_name = {
-                51: 'Установить оповещения',
-                52: 'Отключить оповещения',
-                53: 'Проверить оповещения',
-                54: 'Больше информации об оповещениях Monobank'
-            }
+            buttons_name = {51: 'Установить оповещения', 52: 'Отключить оповещения', 53: 'Проверить оповещения',
+                            54: 'Больше информации об оповещениях Monobank'}
             self.keyboard(call.message.chat.id, 'Выберите действие:', buttons_name, callback_key='ct',
                           previous_data=call.data)
 
@@ -390,7 +378,6 @@ class BudgetBot(telebot.TeleBot):
                             categories.items()}
             self.keyboard(call.message.chat.id, 'Выберите категорию:', buttons_name, callback_key='ct',
                           previous_data=data)
-
         elif func_id == 31 or func_id == 32:
             self.send_message(chat_id=call.message.chat.id,
                               text='Введите новое имя категории {}:'.format(
@@ -473,10 +460,10 @@ class BudgetBot(telebot.TeleBot):
             self.send_message(chat_id=call.message.chat.id,
                               text='За этот период нет транзакций.')
 
-    @delete_message
     def get_report(self, call):
         """Starting the preparation of the report, depending on the user's choice"""
 
+        self.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
         callback_data = json.loads(call.data)
         report_for = callback_data.get('ct')
 
@@ -499,8 +486,8 @@ class BudgetBot(telebot.TeleBot):
         elif report_for != 99:
             self.prepare_report(call, report_for)
 
-    @delete_message
     def delete_category(self, call):
+        self.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
         callback_data = json.loads(call.data)
         if callback_data.get('ct') == 99:
             self.send_message(chat_id=call.message.chat.id, text='Нельзя удалить категорию.')
@@ -514,8 +501,8 @@ class BudgetBot(telebot.TeleBot):
             else:
                 self.send_message(chat_id=call.message.chat.id, text='Что-то пошло не так (')
 
-    @delete_message
     def delete_subcategories(self, call):
+        self.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
         callback_data = json.loads(call.data)
         categories = self.db.get_category(call.from_user.id)
         subcategories_dict = categories.get(callback_data.get('ct', ), {}).get('subcategories')
@@ -538,9 +525,9 @@ class BudgetBot(telebot.TeleBot):
             else:
                 self.send_message(chat_id=call.message.chat.id, text='Что-то пошло не так (')
 
-    @delete_message
     def add_subcategory(self, call):
         callback_data = json.loads(call.data)
+        self.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
         if callback_data.get('ct') == 99:
             self.send_message(chat_id=call.message.chat.id, text='Нельзя добавить подкатегорию.')
             return
@@ -578,7 +565,7 @@ class BudgetBot(telebot.TeleBot):
     def ask_again(self, call):
         """Confirmation of the choice made"""
 
-        delete_message(self, chat_id=call.message.chat.id, message_id=call.message.message_id)
+        self.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
         callback_data = json.loads(call.data)
         categories = self.db.get_category(call.from_user.id)
         category_name = categories.get(callback_data.get('ct', ), {}).get('name', 'Name Error')
@@ -591,12 +578,12 @@ class BudgetBot(telebot.TeleBot):
         self.keyboard(call.message.chat.id, t.get(callback_data.get('a'), 'Вы уверенны?'), buttons_name,
                       callback_key='an', previous_data=call.data, add_cancel=False)
 
-    @delete_message
     def text(self, message):
         """Processing text messages from the user and calling certain functions"""
 
         if message.reply_to_message:
-            delete_message(self, chat_id=message.chat.id, message_id=message.reply_to_message.message_id)
+            self.delete_message(chat_id=message.chat.id, message_id=message.reply_to_message.message_id)
+            self.delete_message(chat_id=message.chat.id, message_id=message.message_id)
             if message.reply_to_message.text.find('Категория') != -1 and message.reply_to_message.text.find(
                     'Сумма:') != -1:
                 if message.reply_to_message.text.find(' грн.') != -1:
@@ -809,6 +796,12 @@ class BudgetBot(telebot.TeleBot):
         keyboard.add(*list_keys)
         self.send_message(int(chat_id), message_text, reply_markup=keyboard)
 
+    def delete_message(self, chat_id, message_id):
+        try:
+            return super().delete_message(chat_id, message_id)
+        except:
+            pass
+
     def monobank_api_adapter(self, request_data, user_info):
         data = get_dict_from_encrypt_data(user_info)
         user_id = data.get('user_id')
@@ -857,6 +850,5 @@ def send_message_telegram(message, chat_id, subject=''):
         ).json()
         if not response['ok']:
             logging.error(f'Error for send message to :{chat_id}. Error: {response.get("description")}')
-            logging.error(f'Chat id: %s. Message: %s.')
     except Exception as e:
         logging.error(f'Send message Error.\n Error: {e}')

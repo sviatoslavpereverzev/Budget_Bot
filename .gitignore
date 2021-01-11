@@ -1,0 +1,8 @@
+*.ini
+.DS_Store
+/privat_api_client.py
+/venv
+/private
+/logs
+.idea/
+__pycache__/

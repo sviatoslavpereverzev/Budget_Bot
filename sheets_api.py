@@ -52,12 +52,10 @@ class SheetsApi:
         # The file token.pickle stores the user's access and refresh tokens, and is
         # created automatically when the authorization flow completes for the first
         # time.
-
         if os.path.exists(os.path.dirname(os.path.realpath(__file__)) + '/private/token.pickle'):
             with open(os.path.dirname(os.path.realpath(__file__)) + '/private/token.pickle', 'rb') as token:
                 creds = pickle.load(token)
         # If there are no (valid) credentials available, let the user log in.
-
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
@@ -69,12 +67,8 @@ class SheetsApi:
             with open(os.path.dirname(os.path.realpath(__file__)) + '/private/token.pickle', 'wb') as token:
                 pickle.dump(creds, token)
 
-        logging.error('Creds: %s' % creds)
-        if creds:
-            logging.error('Creds valid: %s' % creds.valid)
-
-        self.drive_service = build('drive', 'v3', credentials=creds, cache_discovery=True)
-        self.sheet_service = build('sheets', 'v4', credentials=creds, cache_discovery=True)
+        self.drive_service = build('drive', 'v3', credentials=creds)
+        self.sheet_service = build('sheets', 'v4', credentials=creds)
 
     def create_sheet(self, db):
         """Creating a new table for the user and adding necessary sheets"""
@@ -303,23 +297,13 @@ class SheetsApi:
                         logging.error(f'Ошибка при изменении таблицы {spreadsheet_id}')
 
     def main(self):
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        logging.basicConfig(level=logging.ERROR,
-                            format=u'%(filename) s[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]: %(message)s',
-                            filename='%s/logs/sheets_app.log' % dir_path, )
         logging.error('Start Sheet API')
         db = DB()
         self.set_service()
-
-        time_refresh = time.time() + 3600
         while True:
             self.create_sheet(db)
             self.change_sheet_id(db)
             self.add_data(db)
-            if time_refresh < time.time():
-                self.set_service()
-                time_refresh = time.time() + 3600
-                logging.error('Refresh service')
             time.sleep(0.2)
 
 

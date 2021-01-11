@@ -84,6 +84,8 @@ def simple_commands(command, user_info):
 
 @app.route('/monobank_api/v1/<user_info>', methods=['POST'])
 def mono_api(user_info):
+    logging.error(user_info)
+    logging.error(flask.request.headers)
     if flask.request.headers.get('content-type') == 'application/json':
         if flask.request.data:
             request_data = json.loads(flask.request.data)

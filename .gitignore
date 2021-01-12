@@ -1,7 +1,5 @@
 *.ini
 *.pickle
-encryption.py
-/privat_api_client.py
 .DS_Store
 .idea/
 /private
